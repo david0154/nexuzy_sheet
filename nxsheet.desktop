@@ -1,0 +1,19 @@
+[Desktop Entry]
+Categories=Office;Spreadsheet;
+Comment[en_US]=NXSheet is a non-traditional spreadsheet application that is based on and written in the programming language Python
+Comment=NXSheet is a non-traditional spreadsheet application that is based on and written in the programming language Python
+Exec=nxsheet
+GenericName[en_US]=Python based Spreadsheet
+GenericName=Python based Spreadsheet
+Keywords=python;spreadsheet;matplotlib;math;
+Icon=nxsheet
+MimeType=application/x-nxsheet-spreadsheet;application/x-nxsheet-bz-spreadsheet
+Name[en_US]=NXSheet
+Name=NXSheet
+StartupNotify=false
+Terminal=false
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=

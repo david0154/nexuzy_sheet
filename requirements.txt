@@ -1,0 +1,21 @@
+# Core app requirements only. This avoids native C++ build toolchains.
+PyQt6 (>=6.4)
+numpy (>=1.1)
+setuptools (>=40.0)
+markdown2 (>= 2.3)
+pymupdf (>=1.23.0)
+
+# Optional extras for charts and utilities only.
+matplotlib [extra] (>=1.1.1)
+pyenchant [extra] (>=1.1)
+pip [extra] (>=18)
+python-dateutil [extra] (>=2.7.0)
+py-moneyed [extra] (>=2.0)
+rpy2 [extra] (>=3.4)
+plotnine [extra] (>=0.8)
+pycel [extra] (>=1.0b30)
+openpyxl [extra] (>=3.0.7)
+
+# For AI/OCR features, install the optional file instead of the base requirements:
+# python -m pip install -r nxsheet/optional_ai_requirements.txt
+

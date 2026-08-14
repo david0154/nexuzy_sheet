@@ -1,0 +1,22 @@
+# Core application requirements (Python-only, no C++ toolchain required)
+PyQt6 (>=6.4)
+numpy (>=1.1)
+setuptools (>=40.0)
+markdown2 (>= 2.3)
+pymupdf (>=1.23.0)
+
+# Optional extras
+matplotlib [extra] (>=1.1.1)
+pyenchant [extra] (>=1.1)
+pip [extra] (>=18)
+python-dateutil [extra] (>=2.7.0)
+py-moneyed [extra] (>=2.0)
+rpy2 [extra] (>=3.4)
+plotnine [extra] (>=0.8)
+pycel [extra] (>=1.0b30)
+openpyxl [extra] (>=3.0.7)
+
+# AI/OCR packages are intentionally not in the default install list.
+# Install them manually only when needed:
+# python -m pip install -r nxsheet/optional_ai_requirements.txt
+# Note: No llama-cpp-python or C++ build tooling is required for the base app.
