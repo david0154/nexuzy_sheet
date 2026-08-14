@@ -26,7 +26,7 @@ Nexuzy Sheet is a Python spreadsheet workspace for business data, templates, cal
 
 ```bash
 git https://github.com/david0154/nexuzy-sheet.git
-cd <your-repo>
+cd nexuzy-sheet
 ```
 
 ### 2) Create and activate a virtual environment
