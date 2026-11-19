@@ -98,8 +98,14 @@ Requirements: Python 3.8 or newer (tested with Python 3.14 on Windows) and a
 desktop session.
 
 ```bash
+<<<<<<< HEAD
 git clone https://github.com/david0154/nexuzy-sheet.git
 cd nexuzy-sheet
+=======
+git https://github.com/david0154/nexuzy-sheet.git
+cd nexuzy-sheet
+```
+>>>>>>> c488941466627dc306aeb63ddb5a67682561d9dc
 
 python -m venv .venv
 # Windows PowerShell
