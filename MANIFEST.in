@@ -1,6 +1,8 @@
-include changelog LICENSE MANIFEST.in README.md THANKS requirements.txt
-include *.py *.pth *.bat *.desktop
-recursive-include bin
-recursive-include pyspread/share *.py *.pysu *.svg *.ico *.html *.png *.css COPYING LICENSE AUTHORS
-recursive-include pyspread *.pysu *.py *.csv
-recursive-exclude pyspread *.pyc
+include changelog LICENSE MANIFEST.in README.md requirements.txt
+include build_installers.py nxsheet.desktop nxsheet.sh nxsheet.pth
+recursive-include installers *.py *.spec *.iss *.plist *.sh *.desktop *.md AppRun
+recursive-include nxsheet/assets *.ico *.png *.icns *.svg
+recursive-include nxsheet/share *.py *.pysu *.svg *.ico *.html *.png *.css COPYING LICENSE AUTHORS *.md
+recursive-include nxsheet *.pysu *.py *.csv
+recursive-exclude nxsheet *.pyc
+recursive-exclude * __pycache__

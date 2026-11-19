@@ -24,12 +24,12 @@ class AIConfig:
     
     # Model registry with download URLs and SHA-256 checksums
     MODELS = {
-        "qwen3-0.6b": {
-            "name": "Qwen3-0.6B GGUF Q4",
-            "size_mb": 512,
-            "sha256": "placeholder_sha256_qwen3_06b_q4",
-            # In production, use official Hugging Face/Modelscope URLs
-            "url": "https://huggingface.co/qwen/Qwen3-0.6B-GGUF/resolve/main/qwen3-0.6b-q4.gguf",
+        "qwen2.5-0.5b-instruct": {
+            "name": "Qwen2.5-0.5B-Instruct GGUF Q4_K_M",
+            "size_mb": 491,
+            "sha256": "placeholder_sha256_qwen25_05b_instruct_q4km",
+            "url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF"
+                   "/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
         },
         "paddleocr-pp-ocrv6-tiny": {
             "name": "PaddleOCR PP-OCRv6 Tiny",

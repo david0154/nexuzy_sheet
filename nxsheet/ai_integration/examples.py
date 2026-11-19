@@ -191,6 +191,6 @@ if __name__ == "__main__":
         print(f"\n❌ Error: {e}")
         print("\nNote: Some examples require:")
         print("  - Dependencies installed: pip install llama-cpp-python paddleocr opencv-python pymupdf")
-        print("  - Qwen3 model downloaded to ~/.nexuzy_sheet/ai_models/")
+        print("  - Qwen2.5 model downloaded to ~/.nexuzy_sheet/ai_models/")
         print("  - Image/PDF files for document import examples")
 

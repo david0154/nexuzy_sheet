@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -247,6 +257,51 @@ class SetCellCode(QUndoCommand):
             for index, old_code in zip(self.indices, self.old_codes):
                 self.model.setData(index, old_code, Qt.ItemDataRole.EditRole,
                                    raw=True)
+        self.model.safe_data_changed()
+
+
+class FillCells(QUndoCommand):
+    """Fills cells with code that is copied from other cells"""
+
+    def __init__(self, model: QAbstractTableModel, codes: dict,
+                 description: str):
+        """
+        :param model: Model of the grid object
+        :param codes: Maps cell key (row, column, table) to new cell code
+        :param description: Command description
+
+        """
+
+        super().__init__(description)
+
+        self.model = model
+        self.codes = codes
+        self.old_codes = {}
+
+    def redo(self):
+        """Redo cell filling, updates screen"""
+
+        code_array = self.model.code_array
+        self.old_codes = {}
+
+        for key, code in self.codes.items():
+            try:
+                self.old_codes[key] = code_array(key)
+                code_array[key] = code
+            except (IndexError, KeyError):
+                pass
+
+        self.model.safe_data_changed()
+
+    def undo(self):
+        """Undo cell filling, updates screen"""
+
+        code_array = self.model.code_array
+
+        for key, code in self.old_codes.items():
+            code_array[key] = code
+
+        self.old_codes = {}
         self.model.safe_data_changed()
 
 

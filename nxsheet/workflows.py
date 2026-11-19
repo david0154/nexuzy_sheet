@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -25,7 +35,7 @@
 
 """
 
-Workflows for pyspread
+Workflows for Nexuzy Sheet
 
 """
 
@@ -75,7 +85,8 @@ try:
                 FileSaveDialog, ImageFileOpenDialog, ChartDialog,
                 CellKeyDialog, FindDialog, ReplaceDialog, CsvFileImportDialog,
                 CsvImportDialog, CsvExportDialog, CsvExportAreaDialog,
-                FileExportDialog, SvgExportAreaDialog, SinglePageArea)
+                FileExportDialog, SvgExportAreaDialog, SinglePageArea,
+                InsertFunctionDialog, TemplateGalleryDialog)
     from nxsheet.interfaces.pys import PysReader, PysWriter
     from nxsheet.interfaces.xlsx import XlsxReader
     from nxsheet.lib.attrdict import AttrDict
@@ -94,7 +105,8 @@ except ImportError:
                 FileSaveDialog, ImageFileOpenDialog, ChartDialog,
                 CellKeyDialog, FindDialog, ReplaceDialog, CsvFileImportDialog,
                 CsvImportDialog, CsvExportDialog, CsvExportAreaDialog,
-                FileExportDialog, SvgExportAreaDialog, SinglePageArea)
+                FileExportDialog, SvgExportAreaDialog, SinglePageArea,
+                InsertFunctionDialog, TemplateGalleryDialog)
     from interfaces.pys import PysReader, PysWriter
     from interfaces.xlsx import XlsxReader
     from lib.attrdict import AttrDict
@@ -253,6 +265,75 @@ class Workflows:
         # Exit safe mode
         self.main_window.safe_mode = False
 
+    def file_new_from_template(self):
+        """Insert a built-in business template into the current worksheet"""
+
+        try:
+            from nxsheet.templates import TemplateManager
+        except ImportError:
+            from templates import TemplateManager
+
+        dialog = TemplateGalleryDialog(self.main_window)
+        if not dialog.exec() or not dialog.selected_template:
+            return
+
+        name = dialog.selected_template
+        template = TemplateManager.get_template(name) or {}
+        data = TemplateManager.apply_template_to_sheet(name, {"data": []})
+        if not data:
+            return
+
+        grid = self.main_window.focused_grid
+        model = grid.model
+        table = grid.table
+        rows = len(data)
+        columns = max((len(line) for line in data), default=0)
+
+        # Enlarge the grid if the template does not fit
+        if rows > model.shape[0] or columns > model.shape[1]:
+            shape = (max(rows, model.shape[0]),
+                     max(columns, model.shape[1]), model.shape[2])
+            self._resize_grid(shape)
+
+        description = f"Insert template {name} at cell {grid.current}"
+
+        command = None
+        for row_index, line in enumerate(data):
+            for column_index, value in enumerate(line):
+                if value is None:
+                    continue
+                index = model.index(row_index, column_index)
+                _command = commands.SetCellCode(repr(value), model, index,
+                                                description)
+                try:
+                    command.mergeWith(_command)
+                except AttributeError:
+                    command = _command
+
+        if command is not None:
+            self.main_window.undo_stack.push(command)
+
+        # Merge the title areas that are defined by the template
+        for top, left, bottom, right in template.get("merged_cells", []):
+            selection = Selection([(top, left)], [(bottom, right)],
+                                  [], [], [])
+            attribute = CellAttribute(
+                selection, table,
+                AttrDict([("merge_area", (top, left, bottom, right))]))
+            model.code_array.cell_attributes.append(attribute)
+
+        for grid_ in self.main_window.grids:
+            grid_.update_cell_spans()
+            grid_.update_index_widgets()
+            grid_.reset_selection()
+
+        grid.current = 0, 0
+        grid.autofit_columns(list(range(columns)))
+        grid.autofit_rows(list(range(rows)))
+
+        self.main_window.statusBar().showMessage(
+            f"Inserted template {template.get('name', name)}.")
+
     def count_file_lines(self, filepath: Path):
         """Returns line count of file in filepath
 
@@ -305,13 +386,14 @@ class Workflows:
             self.main_window.safe_mode = True
 
         # File format handling
-        if filepath.suffix == ".nxl":
+        suffix = filepath.suffix.lower()
+        if suffix == ".nxl":
             fopen = open
             freader = PysReader
-        elif filepath.suffix == ".nxs":
+        elif suffix in {".nix", ".nxs"}:
             fopen = bz2.open
             freader = PysReader
-        elif filepath.suffix == ".xlsx":
+        elif suffix == ".xlsx":
             if openpyxl is None:
                 msg = f"openpyxl is not installed. {filepath} not opened."
                 self.main_window.statusBar().showMessage(msg)
@@ -341,17 +423,17 @@ class Workflows:
                     for i, _ in file_progress_gen(self.main_window, reader,
                                                   title, label, filelines):
                         pass
-                except Exception as error:
-                    logging.error(error)
-                    grid.model.reset()
-                    self.main_window.statusBar().showMessage(str(error))
-                    self.main_window.safe_mode = False
-                    return
                 except ProgressDialogCanceled:
                     msg = f"File open stopped by user at line {i}."
                     logging.info(msg)
                     self.main_window.statusBar().showMessage(msg)
                     grid.model.reset()
+                    self.main_window.safe_mode = False
+                    return
+                except Exception as error:
+                    logging.exception("Error reading workbook %s", filepath)
+                    grid.model.reset()
+                    self.main_window.statusBar().showMessage(str(error))
                     self.main_window.safe_mode = False
                     return
 
@@ -461,7 +543,7 @@ class Workflows:
     def _save(self, filepath: Path):
         """Save filepath using chosen_filter
 
-        Compresses save file if filepath.suffix is `.pys`
+        Compresses the save file if the suffix is `.nix` or `.nxs`
 
         :param filepath: Path of file to be saved
 
@@ -486,7 +568,7 @@ class Workflows:
                             self.main_window, pys_writer, title, label,
                             len(pys_writer)):
                         line = bytes(line, "utf-8")
-                        if filepath.suffix == ".nxs":
+                        if filepath.suffix.lower() in {".nix", ".nxs"}:
                             line = bz2.compress(line)
                         tempfile.write(line)
 
@@ -526,6 +608,14 @@ class Workflows:
 
         # Update recent files in the file menu
         self.main_window.menuBar().file_menu.history_submenu.update_()
+
+        # Sign approved workbooks so they open without safe mode next time.
+        self.sign_file(filepath)
+
+        # Clear the auto save recovery copy and write an automatic backup
+        autosave = getattr(self.main_window, "autosave", None)
+        if autosave is not None:
+            autosave.on_saved(filepath)
 
         # Avoid generating per-file signature sidecars; the app stores
         # authenticity metadata separately and should not create extra .sig files.
@@ -1592,7 +1682,7 @@ class Workflows:
         grid = self.main_window.focused_grid
         model = grid.model
 
-        # The mimetypes that are supported by pyspread
+        # The mimetypes that are supported by Nexuzy Sheet
         mimetypes = ("image", "text/html", "text/plain")
         clipboard = QApplication.clipboard()
         formats = clipboard.mimeData().formats()
@@ -1957,6 +2047,21 @@ class Workflows:
 
         self._sort(ascending=False)
 
+    def autofit_columns(self):
+        """Fits the width of the selected columns to their content"""
+
+        self.main_window.focused_grid.autofit_columns()
+
+    def autofit_rows(self):
+        """Fits the height of the selected rows to their content"""
+
+        self.main_window.focused_grid.autofit_rows()
+
+    def autofit_selection(self):
+        """Fits columns and rows of the selection to their content"""
+
+        self.main_window.focused_grid.autofit_selection()
+
     def edit_resize(self):
         """Edit -> Resize workflow"""
 
@@ -2242,25 +2347,70 @@ class Workflows:
         """
 
         grid = self.main_window.focused_grid
-        selection = grid.selection
         shape = grid.model.shape
+        selection = grid.selection
 
-        (top, left), (bottom, right) = selection.get_grid_bbox(shape)
+        try:
+            if not selection:
+                raise ValueError("No cell selection")
+            (top, left), (bottom, right) = selection.get_grid_bbox(shape)
+        except (AttributeError, TypeError, ValueError):
+            self.main_window.statusBar().showMessage("No cell selection.")
+            return
 
-        if bottom >= shape[0] - 1:
+        top, left = max(0, top), max(0, left)
+        bottom = min(shape[0] - 1, bottom if bottom is not None else shape[0] - 1)
+        right = min(shape[1] - 1, right if right is not None else shape[1] - 1)
+
+        if top > bottom or left > right:
+            self.main_window.statusBar().showMessage("No cell selection.")
+            return
+
+        if bottom + 1 >= shape[0]:
             self.main_window.statusBar().showMessage(
                 "ValueError: Target cell is beyond grid limits")
             return
 
         key = bottom + 1, right, grid.table
 
-        code = f"numpy.sum(eval({repr(selection)}" + \
-               f".get_absolute_access_string({shape}, Z)))"
+        selected = list(selection.cell_generator(shape, grid.table))
+        if not selected:
+            self.main_window.statusBar().showMessage("No cell selection.")
+            return
 
+        access = ", ".join(f"S[{cell!r}]" for cell in selected)
+        code = f"SUM({access})"
+
+        grid.model.code_array[key] = code
+        grid.model.safe_data_changed()
         grid.current = key
         index = grid.currentIndex()
         description = f"Insert sum of {selection} into cell {key}"
         command = commands.SetCellCode(code, grid.model, index, description)
+        self.main_window.undo_stack.push(command)
 
+    def macro_insert_function(self):
+        """Opens the insert function dialog for the current cell
+
+        The chosen Excel compatible function is inserted into the code of the
+        current cell.
+
+        """
+
+        grid = self.main_window.focused_grid
+        index = grid.currentIndex()
+        model = grid.model
+        code = model.code(index)
+
+        dialog = InsertFunctionDialog(self.main_window, formula=code or "")
+        if not dialog.exec() or dialog.formula is None:
+            return
+
+        if dialog.formula == (code or ""):
+            return
+
+        description = f"Insert function into cell {index}"
+        command = commands.SetCellCode(dialog.formula, model, index,
+                                       description)
         self.main_window.undo_stack.push(command)
 

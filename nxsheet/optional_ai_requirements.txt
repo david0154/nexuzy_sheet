@@ -1,10 +1,12 @@
 # Optional AI / OCR packages.
 # Only install this file when you want the extra local intelligence features.
-# These are intentionally separate from the base app requirements to avoid
-# C++ toolchain problems on Windows and unnecessary startup downloads.
+# Install this file for offline Qwen inference and optional OCR support.
+# Model weights and the llama.cpp inference runtime are downloaded separately
+# and only when the user requests it.
 
+huggingface_hub>=0.25.0
+
+# Optional document OCR dependencies
 opencv-python>=4.8.0
 paddleocr>=2.8.0
-ctransformers>=0.2.27
-huggingface_hub>=0.25.0
 pymupdf>=1.23.0

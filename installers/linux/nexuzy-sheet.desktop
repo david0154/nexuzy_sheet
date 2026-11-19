@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Nexuzy Sheet
+GenericName=Spreadsheet
+Comment=Nexuzy Sheet is an Excel-like spreadsheet workspace developed by Nexuzy Lab
+Comment[en_US]=Nexuzy Sheet is an Excel-like spreadsheet workspace developed by Nexuzy Lab
+Exec=nexuzy-sheet %F
+TryExec=nexuzy-sheet
+Icon=nexuzy-sheet
+Terminal=false
+Categories=Office;Spreadsheet;Finance;
+Keywords=spreadsheet;excel;nix;csv;xlsx;sheet;table;formula;nexuzy;
+MimeType=application/x-nexuzy-sheet;application/x-nexuzy-sheet-compressed;application/x-nexuzy-sheet-uncompressed;
+StartupNotify=true
+StartupWMClass=nexuzy-sheet

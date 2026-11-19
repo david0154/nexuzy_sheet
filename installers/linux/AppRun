@@ -1,0 +1,8 @@
+#!/bin/sh
+# Copyright (c) 2026 Nexuzy Lab David
+# AppRun entry point of the Nexuzy Sheet AppImage.
+# --------------------------------------------------------------------
+
+HERE="$(dirname "$(readlink -f "$0")")"
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+exec "$HERE/usr/bin/nexuzy-sheet" "$@"

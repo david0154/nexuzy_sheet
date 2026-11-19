@@ -6,18 +6,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -72,7 +82,7 @@ from PyQt6.QtWidgets \
             QTextBrowser, QCheckBox, QGridLayout, QLayout, QHBoxLayout,
             QPushButton, QWidget, QComboBox, QTableView, QAbstractItemView,
             QPlainTextEdit, QToolBar, QMainWindow, QTabWidget, QInputDialog,
-            QComboBox)
+            QComboBox, QListWidget)
 from PyQt6.QtGui \
     import (QIntValidator, QImageWriter, QStandardItemModel, QStandardItem,
             QValidator, QWheelEvent)
@@ -96,6 +106,19 @@ try:
     import moneyed
 except ImportError:
     moneyed = None
+
+try:
+    from nxsheet.__init__ import (APP_NAME, APP_FULL_NAME, VERSION, COMPANY,
+                                  COMPANY_URL, SUPPORT_EMAIL, INFO_EMAIL,
+                                  LICENSE_NAME, LICENSE_URL, LICENSE_TEXT,
+                                  COPYRIGHT)
+    from nxsheet.lib.excel_functions import EXCEL_FUNCTION_DOCS
+except ImportError:
+    from __init__ import (APP_NAME, APP_FULL_NAME, VERSION, COMPANY,
+                          COMPANY_URL, SUPPORT_EMAIL, INFO_EMAIL,
+                          LICENSE_NAME, LICENSE_URL, LICENSE_TEXT,
+                          COPYRIGHT)
+    from lib.excel_functions import EXCEL_FUNCTION_DOCS
 
 try:
     from nxsheet.actions import ChartDialogActions
@@ -652,8 +675,9 @@ class FileDialogBase:
     title = "Choose file"
 
     filters_list = [
-        "Nexuzy un-compressed (*.nxl)",
-        "Nexuzy compressed (*.nxs)",
+        "Nexuzy Sheet workbook (*.nix)",
+        "Nexuzy Sheet uncompressed (*.nxl)",
+        "Nexuzy Sheet compressed (*.nxs)",
     ]
     if openpyxl is not None:
         filters_list.append("Office Open XML - Tabellendokument (*.xlsx)")
@@ -1809,4 +1833,429 @@ class PrintPreviewDialog(QPrintPreviewDialog):
             self.combo_zoom.setCurrentText(str(round(zoom_factor*100, 1))+"%")
         else:
             super().wheelEvent(event)
+
+
+#: Legal documents shown in the About dialog, in display order
+LEGAL_DOCUMENTS = (
+    ("EULA.md", "EULA"),
+    ("TERMS_OF_SERVICE.md", "Terms"),
+    ("PRIVACY_POLICY.md", "Privacy"),
+)
+
+
+def legal_document_path(filename: str):
+    """Returns the path of a bundled legal document, or None
+
+    :param filename: File name inside the docs folder
+
+    """
+
+    import sys
+    from pathlib import Path
+
+    here = Path(__file__).resolve().parent
+    candidates = []
+    bundle = getattr(sys, "_MEIPASS", None)
+    if bundle:
+        candidates.append(Path(bundle) / "docs" / filename)
+    candidates.append(here.parent / "docs" / filename)
+    candidates.append(here / "docs" / filename)
+    try:
+        executable = Path(sys.executable).resolve().parent
+    except OSError:
+        executable = None
+    if executable is not None:
+        candidates.append(executable / "docs" / filename)
+        candidates.append(executable.parent / "docs" / filename)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+class AboutDialog(QDialog):
+    """About dialog with application, licence and legal documents"""
+
+    window_title = "About Nexuzy Sheet"
+    size_hint = 680, 620
+
+    def __init__(self, parent: QWidget = None):
+        """
+        :param parent: Parent widget
+
+        """
+
+        super().__init__(parent)
+
+        self.setWindowTitle(self.window_title)
+        self.setMinimumSize(560, 480)
+
+        self.tabs = QTabWidget(self)
+        self.tabs.addTab(self._create_about_browser(), "About")
+        self.tabs.addTab(self._create_license_browser(), "License")
+        for filename, title in LEGAL_DOCUMENTS:
+            self.tabs.addTab(self._create_document_browser(filename, title),
+                             title)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Close, self)
+        button_box.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.addWidget(self.tabs, 1)
+        layout.addWidget(button_box, 0)
+
+    def _create_about_browser(self) -> QTextBrowser:
+        """Returns the browser that displays the application information"""
+
+        browser = QTextBrowser(self)
+        browser.setOpenExternalLinks(True)
+        browser.setHtml(self.about_html())
+        return browser
+
+    def _create_license_browser(self) -> QPlainTextEdit:
+        """Returns the read only widget with the full license text"""
+
+        browser = QPlainTextEdit(self)
+        browser.setReadOnly(True)
+        browser.setPlainText(LICENSE_TEXT)
+        return browser
+
+    def _create_document_browser(self, filename: str,
+                                 title: str) -> QPlainTextEdit:
+        """Returns a read only widget with a bundled legal document
+
+        :param filename: File name inside the docs folder
+        :param title: Document title used in the fallback text
+
+        """
+
+        browser = QPlainTextEdit(self)
+        browser.setReadOnly(True)
+        path = legal_document_path(filename)
+        if path is not None:
+            try:
+                browser.setPlainText(path.read_text(encoding="utf-8"))
+                return browser
+            except OSError:
+                pass
+        browser.setPlainText(
+            f"The {title} document is not available on this installation.\n\n"
+            f"You can read it online at {COMPANY_URL} or request a copy from "
+            f"{SUPPORT_EMAIL}.")
+        return browser
+
+    def about_html(self) -> str:
+        """Returns the HTML content of the about tab"""
+
+        from platform import machine, platform as platform_string
+
+        try:
+            platform_info = f"{platform_string()} ({machine()})"
+        except Exception:
+            platform_info = "Unknown"
+
+        return f"""
+            <h2 style="margin-bottom: 0;">NEXUZY SHEET</h2>
+            <p style="margin-top: 2px;">{APP_FULL_NAME}</p>
+            <p><b>Version:</b> {VERSION}<br>
+               <b>Platform:</b> {platform_info}<br>
+               <b>License:</b> {LICENSE_NAME}<br>
+               <b>Languages:</b> English, हिन्दी, বাংলা, தமிழ், Español,
+               Français, 中文, Русский, 日本語<br>
+               <b>Native format:</b> .nix</p>
+
+            <p><b>About the application</b><br>
+               <b>Nexuzy Sheet</b> is an Excel-like spreadsheet workspace for
+               business data, templates, calculations, exports, charts and
+               local AI assisted workflows. It is developed by
+               <b>{COMPANY}</b> for students, professionals, businesses,
+               analysts and everyday users.</p>
+
+            <p><b>Excel compatible features</b><br>
+               &bull; Excel formula functions: SUM, AVERAGE, COUNT, IF,
+               VLOOKUP, INDEX, MATCH, TEXT, PMT and many more<br>
+               &bull; Fill down and fill right for selections<br>
+               &bull; Insert function dialog with search<br>
+               &bull; Selection statistics: sum, average, count, min and max<br>
+               &bull; Sorting, filtering and search and replace<br>
+               &bull; Cell formatting, merge, borders and rotation<br>
+               &bull; Multiple sheets, charts and data visualization<br>
+               &bull; XLSX, XLS, ODS, CSV, SVG and PDF import and export<br>
+               &bull; Undo and redo, keyboard shortcuts and frozen cells</p>
+
+            <p><b>Workbook format and data safety</b><br>
+               &bull; Native workbook format <b>.nix</b> (compressed)<br>
+               &bull; Auto save writes a recovery copy while there are
+               unsaved changes<br>
+               &bull; Automatic backups keep up to 20 versions per workbook
+               in <b>Version history</b><br>
+               &bull; Nine user interface languages with a language menu in
+               <b>View &rarr; Language</b></p>
+
+            <p><b>Developed by</b><br>
+               <b>{COMPANY}</b><br>
+               <b>Lead Developers:</b> David, Manoj Konar</p>
+
+            <p><b>AI assistant</b><br>
+               <b>Name:</b> Nexuzy AI<br>
+               <b>Model:</b> Qwen2.5-0.5B-Instruct (GGUF Q4_K_M), running
+               locally with llama.cpp<br>
+               <b>Formulas known to Nexuzy AI:</b> the complete built-in
+               function library, signatures included</p>
+
+            <p><b>Official links</b><br>
+               Nexuzy Sheet web app: <a href="https://sheet.nexuzy.in">https://sheet.nexuzy.in</a><br>
+               Source code: <a href="https://github.com/david0154/nexuzy_sheet">https://github.com/david0154/nexuzy_sheet</a><br>
+               Company website: <a href="{COMPANY_URL}">{COMPANY_URL}</a></p>
+
+            <p><b>Support</b><br>
+               <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a><br>
+               <a href="mailto:{INFO_EMAIL}">{INFO_EMAIL}</a></p>
+
+            <p><b>License</b><br>
+               Nexuzy Sheet is released under the <b>{LICENSE_NAME}</b>.<br>
+               {COPYRIGHT}<br>
+               <a href="{LICENSE_URL}">{LICENSE_URL}</a><br>
+               The full license text is available on the
+               <b>License</b> tab. The end user licence agreement, the terms
+               of service and the privacy policy are on the <b>EULA</b>,
+               <b>Terms</b> and <b>Privacy</b> tabs, and the licences of the
+               bundled third-party components are listed in
+               <b>THIRD_PARTY_LICENSES.md</b> in the installation folder.</p>
+
+            <p><b>Product identity</b><br>
+               <b>Product:</b> {APP_NAME}<br>
+               <b>Company:</b> {COMPANY}<br>
+               <b>Web app:</b> https://sheet.nexuzy.in<br>
+               <b>GitHub:</b> https://github.com/david0154/nexuzy_sheet<br>
+               <b>Company website:</b> {COMPANY_URL}<br>
+               <b>License:</b> {LICENSE_NAME}</p>
+        """
+
+    # Overrides
+
+    def sizeHint(self) -> QSize:
+        """QDialog.sizeHint override"""
+
+        return QSize(*self.size_hint)
+
+
+class TemplateGalleryDialog(QDialog):
+    """Dialog for choosing one of the built-in workbook templates"""
+
+    window_title = "New from template"
+    size_hint = 640, 460
+
+    def __init__(self, parent: QWidget = None):
+        """
+        :param parent: Parent widget
+
+        """
+
+        super().__init__(parent)
+
+        try:
+            from nxsheet.templates import TemplateManager
+        except ImportError:
+            from templates import TemplateManager
+
+        self.selected_template = None
+        self.setWindowTitle(self.window_title)
+        self.setMinimumSize(520, 380)
+
+        self.list = QListWidget(self)
+        for name, display_name in \
+                TemplateManager.get_template_display_names().items():
+            template = TemplateManager.get_template(name) or {}
+            item = QListWidgetItem(display_name)
+            item.setData(Qt.ItemDataRole.UserRole, name)
+            item.setToolTip(template.get("description", ""))
+            self.list.addItem(item)
+
+        info = QLabel("Templates insert a ready-made layout into the current "
+                      "worksheet. Values, merged title areas and column "
+                      "widths are applied automatically.", self)
+        info.setWordWrap(True)
+
+        self.description = QLabel(self)
+        self.description.setWordWrap(True)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel, self)
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText(
+            "Insert template")
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(info)
+        layout.addWidget(self.list, 1)
+        layout.addWidget(self.description)
+        layout.addWidget(button_box)
+
+        self.list.currentItemChanged.connect(self.on_current_changed)
+        self.list.itemDoubleClicked.connect(self.on_double_click)
+        if self.list.count():
+            self.list.setCurrentRow(0)
+
+    def on_current_changed(self, current, previous=None):
+        """Shows the description of the selected template"""
+
+        if current is None:
+            self.description.clear()
+        else:
+            self.description.setText(current.toolTip())
+
+    def on_double_click(self, item):
+        """Accepts the dialog on double click"""
+
+        self.accept()
+
+    def accept(self):
+        """Stores the selected template and closes the dialog"""
+
+        item = self.list.currentItem()
+        if item is not None:
+            self.selected_template = item.data(Qt.ItemDataRole.UserRole)
+        super().accept()
+
+
+class InsertFunctionDialog(QDialog):
+    """Dialog for inserting an Excel compatible function into a cell"""
+
+    window_title = "Insert function"
+    size_hint = 560, 460
+
+    def __init__(self, parent: QWidget = None, formula: str = ""):
+        """
+        :param parent: Parent widget
+        :param formula: Current code of the target cell
+
+        """
+
+        super().__init__(parent)
+
+        #: Cell code that is applied when the dialog is accepted
+        self.formula = None
+
+        self._create_widgets(formula)
+        self._layout()
+
+    def _create_widgets(self, formula: str):
+        """Creates the widgets of the dialog
+
+        :param formula: Current code of the target cell
+
+        """
+
+        self.docs = EXCEL_FUNCTION_DOCS
+
+        self.filter_edit = QLineEdit(self)
+        self.filter_edit.setPlaceholderText(
+            "Search functions, e.g. SUM, IF or VLOOKUP...")
+        self.filter_edit.textChanged.connect(self.update_list)
+
+        self.list_widget = QListWidget(self)
+        self.list_widget.addItems(sorted(self.docs))
+        self.list_widget.currentTextChanged.connect(self.update_description)
+        self.list_widget.itemDoubleClicked.connect(self.on_item_activated)
+
+        self.description_label = QLabel(self)
+        self.description_label.setWordWrap(True)
+        self.description_label.setMinimumHeight(56)
+
+        self.formula_edit = QLineEdit(self)
+        self.formula_edit.setText(formula)
+
+        self.formula_label = QLabel("Cell code:", self)
+
+        self.button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel, self)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+        self.insert_button = self.button_box.addButton(
+            "Insert", QDialogButtonBox.ButtonRole.ActionRole)
+        self.insert_button.clicked.connect(self.on_insert_pressed)
+
+    def _layout(self):
+        """Dialog layout management"""
+
+        self.setWindowTitle(self.window_title)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.addWidget(self.filter_edit)
+        layout.addWidget(self.list_widget, 1)
+        layout.addWidget(self.description_label)
+        layout.addWidget(self.formula_label)
+        layout.addWidget(self.formula_edit)
+        layout.addWidget(self.button_box)
+
+        first = self.list_widget.item(0)
+        if first is not None:
+            self.list_widget.setCurrentItem(first)
+
+    def update_list(self, text: str):
+        """Filters the function list
+
+        :param text: Filter text that is matched against names and docs
+
+        """
+
+        needle = text.strip().casefold()
+        for row in range(self.list_widget.count()):
+            item = self.list_widget.item(row)
+            name = item.text()
+            signature, description = self.docs[name]
+            haystack = f"{name} {signature} {description}".casefold()
+            item.setHidden(bool(needle) and needle not in haystack)
+
+    def update_description(self, name: str):
+        """Shows signature and description of the selected function
+
+        :param name: Function name
+
+        """
+
+        signature, description = self.docs.get(name, ("", ""))
+        self.description_label.setText(f"<b>{signature}</b><br>{description}")
+
+    def on_insert_pressed(self):
+        """Insert button event handler, puts the function into the code"""
+
+        item = self.list_widget.currentItem()
+        if item is None:
+            return
+
+        name = item.text()
+        self.formula_edit.setText(f"{name}()")
+        self.formula_edit.setFocus()
+        self.formula_edit.setCursorPosition(len(name) + 1)
+
+    def on_item_activated(self, item):
+        """Double click event handler, inserts and accepts the dialog
+
+        :param item: Activated list item
+
+        """
+
+        self.formula_edit.setText(f"{item.text()}()")
+        self.accept()
+
+    # Overrides
+
+    def accept(self):
+        """Accepts the dialog and stores the edited cell code"""
+
+        self.formula = self.formula_edit.text()
+        super().accept()
+
+    def sizeHint(self) -> QSize:
+        """QDialog.sizeHint override"""
+
+        return QSize(*self.size_hint)
 

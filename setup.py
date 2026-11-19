@@ -5,99 +5,85 @@
 # Nexuzy Sheet
 #
 # Developed by Nexuzy Lab
+# Website: https://nexuzy.in
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
-#
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
-#
-# Project: Nexuzy Sheet
-# Developer: Nexuzy Lab
-# Copyright: © 2026 Nexuzy Lab
+# Licensed under the MIT License. See the LICENSE file in the project
+# root for the full license text.
 # --------------------------------------------------------------------
 
+"""Packaging metadata for Nexuzy Sheet."""
 
 from setuptools import setup, find_packages
 
-from pyspread import VERSION
+from nxsheet import (VERSION, COMPANY, COMPANY_URL, SUPPORT_EMAIL,
+                     LICENSE_NAME)
 
-with open("README.md", "r", encoding='utf8') as readme_file:
+with open("README.md", "r", encoding="utf8") as readme_file:
     long_description = readme_file.read()
 
 setup(
-    name='pyspread',
+    name="nxsheet",
     version=VERSION,
-    author='Martin Manns',
-    author_email='mmanns@gmx.net',
-    description='Pyspread is a non-traditional spreadsheet application'
-    ' that is based on and written in the programming language Python.',
+    author=COMPANY,
+    author_email=SUPPORT_EMAIL,
+    description="Nexuzy Sheet is an Excel-like spreadsheet workspace written "
+                "in Python with PyQt6.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://pyspread.gitlab.io",
+    url=COMPANY_URL,
     project_urls={
-        "Bug Tracker": "https://gitlab.com/pyspread/pyspread/issues",
-        "Documentation": "https://pyspread.gitlab.io/docs.html",
-        "Source Code": "https://gitlab.com/pyspread/pyspread",
+        "Website": COMPANY_URL,
+        "Source Code": "https://github.com/david0154/nexuzy-sheet",
+        "Bug Tracker": "https://github.com/david0154/nexuzy-sheet/issues",
     },
     packages=find_packages(),
     entry_points={
-        'console_scripts': {
-            'pyspread = pyspread.pyspread:main'
+        "console_scripts": {
+            "nxsheet = nxsheet.main:main",
+            "nexuzy-sheet = nxsheet.main:main",
         }
     },
-    package_data={'pyspread': [
-            'share/*',
-            'share/*/*',
-            'share/*/*/*',
-            'share/*/*/*/*',
-            'share/*/*/*/*/*',
+    package_data={"nxsheet": [
+            "share/*",
+            "share/*/*",
+            "share/*/*/*",
+            "share/*/*/*/*",
+            "share/*/*/*/*/*",
         ]
     },
     data_files=[
-        ('pyspread/share/applications',
-         ['pyspread/share/applications/io.gitlab.pyspread.pyspread.desktop']),
+        ("share/applications", ["nxsheet.desktop"]),
     ],
-    license='GPL v3 :: GNU General Public License',
-    keywords=['spreadsheet', 'pyspread'],
-    python_requires='>=3.6',
-    install_requires=['numpy (>=1.1)',
-                      'PyQt6 (>=6.4)',
-                      'markdown2 (>=2.3)'],
+    license=LICENSE_NAME,
+    keywords=["spreadsheet", "excel", "nxsheet", "nexuzy", "xlsx", "csv"],
+    python_requires=">=3.8",
+    install_requires=[
+        "numpy>=1.1",
+        "PyQt6>=6.4",
+        "markdown2>=2.3",
+        "pymupdf>=1.23.0",
+    ],
     extras_require={
-        'matplotlib': ['matplotlib (>=1.1.1)'],
-        'pyenchant': ['pyenchant (>=1.1)'],
-        'pip': ['pip (>=18)'],
-        'python-dateutil': ['python-dateutil (>=2.7.0)'],
-        'py-moneyed': ['py-moneyed (>=2.0)'],
-        'rpy2': ['rpy2 (>=3.4)'],
-        'plotnine': ['plotnine (>=0.8)'],
-        'pycel': ['pycel (>=1.0b30)'],
-        'openpyxl': ['openpyxl (>=3.0.7)'],
+        "matplotlib": ["matplotlib>=1.1.1"],
+        "pyenchant": ["pyenchant>=1.1"],
+        "dateutil": ["python-dateutil>=2.7.0"],
+        "money": ["py-moneyed>=2.0"],
+        "excel-import": ["openpyxl>=3.0.7", "pycel>=1.0b30"],
+        "rpy2": ["rpy2>=3.4"],
+        "plotnine": ["plotnine>=0.8"],
     },
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Environment :: X11 Applications :: Qt',
-        'Environment :: Win32 (MS Windows)',
-        'Intended Audience :: End Users/Desktop',
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-        'Natural Language :: English',
-        'Operating System :: OS Independent',
-        'Operating System :: POSIX',
-        'Operating System :: Microsoft',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Topic :: Office/Business :: Financial :: Spreadsheet',
-        'Topic :: Scientific/Engineering',
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: X11 Applications :: Qt",
+        "Environment :: Win32 (MS Windows)",
+        "Intended Audience :: End Users/Desktop",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: English",
+        "Operating System :: OS Independent",
+        "Operating System :: POSIX",
+        "Operating System :: Microsoft",
+        "Programming Language :: Python :: 3",
+        "Topic :: Office/Business :: Financial :: Spreadsheet",
+        "Topic :: Scientific/Engineering",
     ],
 )

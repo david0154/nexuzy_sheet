@@ -3,7 +3,7 @@
 # Copyright (c) 2026 Nexuzy Lab
 
 """
-Qwen3-0.6B Language Model Interface
+Qwen2.5-0.5B-Instruct Language Model Interface
 
 Local inference via llama.cpp GGUF quantization.
 Handles:
@@ -25,11 +25,11 @@ try:
     HAS_LLAMA_CPP = True
 except ImportError:
     HAS_LLAMA_CPP = False
-    logger.warning("llama-cpp-python not available. Qwen3 inference disabled.")
+    logger.warning("llama-cpp-python not available. Qwen2.5 inference disabled.")
 
 
 class QwenInterface:
-    """Interface to Qwen3-0.6B model via llama.cpp"""
+    """Interface to the Qwen2.5-0.5B-Instruct model via llama.cpp"""
     
     # System prompt that constrains model to generate only valid actions
     SYSTEM_PROMPT = """You are Nexuzy Sheet AI, an assistant for spreadsheet operations.
@@ -61,10 +61,10 @@ You have access to spreadsheet context like current cell, nearby data, and sheet
     
     def __init__(self, model_path: str, n_ctx: int = 2048, n_threads: int = 4):
         """
-        Initialize Qwen3 interface
+        Initialize the Qwen2.5 interface
         
         Args:
-            model_path: Path to Qwen3-0.6B GGUF model file
+            model_path: Path to the Qwen2.5-0.5B-Instruct GGUF model file
             n_ctx: Context window size (tokens)
             n_threads: Number of CPU threads to use
         """
@@ -83,7 +83,7 @@ You have access to spreadsheet context like current cell, nearby data, and sheet
             )
             self.model_path = model_path
             self.n_ctx = n_ctx
-            logger.info(f"Loaded Qwen3 model: {model_path}")
+            logger.info(f"Loaded Qwen2.5 model: {model_path}")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise
@@ -91,7 +91,7 @@ You have access to spreadsheet context like current cell, nearby data, and sheet
     def generate_response(self, prompt: str, max_tokens: int = 512, 
                          temperature: float = 0.3) -> Optional[str]:
         """
-        Generate response from Qwen3
+        Generate response from Qwen2.5
         
         Args:
             prompt: User prompt/command

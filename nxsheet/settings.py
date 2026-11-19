@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -59,8 +69,8 @@ CHARTS_PATH = ICON_PATH / 'charts'
 WEB_URL = "https://nexuzy.in"  # Official Web page
 
 AUTHORS = """Nexuzy Lab
-             David
-             Manoj"""
+             David (Lead Developer)
+             Manoj Konar (Lead Developer)"""
 
 
 class Settings:
@@ -100,7 +110,7 @@ class Settings:
     last_file_export_path = Path.home()
     """Initial :class:`~pathlib.Path` for exporting files"""
 
-    max_file_history = 5
+    max_file_history = 10
     """Maximum number of files in file history"""
 
     file_history = []
@@ -185,6 +195,27 @@ class Settings:
     theme_mode = "light"
     """Application theme: 'light' or 'dark'"""
 
+    autosave_enabled = True
+    """If `True` then a recovery copy is written automatically"""
+
+    autosave_interval = 120
+    """Interval in seconds between two auto save recovery copies"""
+
+    backup_enabled = True
+    """If `True` then every save creates an automatic backup"""
+
+    max_backups = 20
+    """Maximum number of automatic backups that are kept per workbook"""
+
+    autosave_dir = Path.home() / ".nexuzy_sheet" / "autosave"
+    """Directory for auto save recovery copies"""
+
+    backup_dir = Path.home() / ".nexuzy_sheet" / "backups"
+    """Directory for automatic backups"""
+
+    language = "en"
+    """User interface language code, see :mod:`nxsheet.i18n`"""
+
     def __init__(self, parent: QWidget, reset_settings: bool = False):
         """
         :param parent: Parent widget, normally main window
@@ -261,6 +292,13 @@ class Settings:
         settings.setValue("show_statusbar_sum", self.show_statusbar_sum)
         settings.setValue("theme_mode", self.theme_mode)
         settings.setValue("toolbar_icon_size", self.toolbar_icon_size)
+        settings.setValue("autosave_enabled", self.autosave_enabled)
+        settings.setValue("autosave_interval", self.autosave_interval)
+        settings.setValue("backup_enabled", self.backup_enabled)
+        settings.setValue("max_backups", self.max_backups)
+        settings.setValue("autosave_dir", str(self.autosave_dir))
+        settings.setValue("backup_dir", str(self.backup_dir))
+        settings.setValue("language", self.language)
 
         # GUI state
         for widget_name in self.widget_names:
@@ -339,6 +377,20 @@ class Settings:
         setting2attr("show_statusbar_sum", mapper=qt_bool)
         setting2attr("theme_mode")
         setting2attr("toolbar_icon_size", mapper=int)
+
+        def to_bool(value):
+            """Converts a stored setting into a Python bool"""
+            if isinstance(value, bool):
+                return value
+            return str(value).strip().lower() in ("true", "1", "yes")
+
+        setting2attr("autosave_enabled", mapper=to_bool)
+        setting2attr("autosave_interval", mapper=int)
+        setting2attr("backup_enabled", mapper=to_bool)
+        setting2attr("max_backups", mapper=int)
+        setting2attr("autosave_dir", mapper=Path)
+        setting2attr("backup_dir", mapper=Path)
+        setting2attr("language")
 
         # GUI state
 

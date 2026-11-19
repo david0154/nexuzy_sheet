@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Copyright (c) 2026 Nexuzy Lab - Nexuzy Sheet macOS bundle -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>Nexuzy Sheet</string>
+    <key>CFBundleDisplayName</key>
+    <string>Nexuzy Sheet</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.nexuzy.nexuzysheet</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.4.0</string>
+    <key>CFBundleVersion</key>
+    <string>1.4.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>CFBundleExecutable</key>
+    <string>nexuzy-sheet</string>
+    <key>CFBundleIconFile</key>
+    <string>icon.icns</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright (c) 2026 Nexuzy Lab</string>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key>
+            <string>Nexuzy Sheet document</string>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>nix</string>
+                <string>nxl</string>
+                <string>nxs</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

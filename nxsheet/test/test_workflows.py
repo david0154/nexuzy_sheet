@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -36,10 +46,11 @@ from contextlib import contextmanager
 from os.path import abspath, dirname, join
 from pathlib import Path
 import sys
+from unittest.mock import PropertyMock, patch
 
 import pytest
 
-from PyQt6.QtCore import Qt, QItemSelectionModel
+from PyQt6.QtCore import Qt, QItemSelection, QItemSelectionModel
 from PyQt6.QtWidgets import QApplication
 
 try:
@@ -100,6 +111,34 @@ class TestWorkflows:
         main_window.settings.changed_since_save = True
         self.workflows.reset_changed_since_save()
         assert not main_window.settings.changed_since_save
+
+    def test_insert_sum_creates_scalar_sum_formula(self):
+        grid = main_window.grid
+        grid.model.code_array[0, 0, 0] = "1"
+        grid.model.code_array[0, 1, 0] = "2"
+        grid.model.code_array[1, 0, 0] = "3"
+        grid.model.code_array[1, 1, 0] = "4"
+
+        from nxsheet.lib.selection import Selection
+        selection = Selection([(0, 0)], [(1, 1)], [], [], [])
+        main_window._last_focused_grid = grid
+        grid.current = (3, 2, 0)
+        with patch.object(type(grid), "selection", new_callable=PropertyMock,
+                          return_value=selection):
+            self.workflows.macro_insert_sum()
+
+        code = grid.model.code_array[2, 1, 0]
+        assert code == 10
+
+    def test_legacy_lowercase_sum_skips_empty_cells(self):
+        grid = main_window.grid
+        grid.model.code_array[0, 1, 0] = "1"
+        grid.model.code_array[1, 1, 0] = "2"
+        grid.model.code_array[2, 1, 0] = "3"
+        code = ("sum(value for value in (S[(0, 1, 0)], S[(1, 1, 0)], "
+                "S[(2, 1, 0)], S[(3, 1, 0)]) if value is not None)")
+
+        assert grid.model.code_array._eval_cell((4, 1, 0), code) == 6
 
     def test_export_filters_include_common_formats(self):
         """Common export formats should be available."""

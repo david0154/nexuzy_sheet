@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -60,9 +70,11 @@ except ImportError:
 try:
     from nxsheet.actions import MainWindowActions
     from nxsheet.icons import Icon
+    from nxsheet.i18n import LANGUAGES
 except ImportError:
     from actions import MainWindowActions
     from icons import Icon
+    from i18n import LANGUAGES
 
 
 class MenuBar(QMenuBar):
@@ -84,6 +96,7 @@ class MenuBar(QMenuBar):
         self.view_menu = ViewMenu(self, actions)
         self.format_menu = FormatMenu(self, actions)
         self.macro_menu = MacroMenu(self, actions)
+        self.ai_menu = AIMenu(self, actions)
         self.help_menu = HelpMenu(self, actions)
 
         self.addMenu(self.file_menu)
@@ -91,7 +104,13 @@ class MenuBar(QMenuBar):
         self.addMenu(self.view_menu)
         self.addMenu(self.format_menu)
         self.addMenu(self.macro_menu)
+        self.addMenu(self.ai_menu)
         self.addMenu(self.help_menu)
+
+    def update_language_menu(self):
+        """Updates the language submenu of the view menu"""
+
+        self.view_menu.update_language_menu()
 
 
 class FileMenu(QMenu):
@@ -109,12 +128,15 @@ class FileMenu(QMenu):
         self.parent = parent
 
         self.addAction(actions.new)
+        self.addAction(actions.new_from_template)
         self.addAction(actions.open)
         self.history_submenu = FileHistoryMenu(self, actions)
         self.history_action = self.addMenu(self.history_submenu)
         self.addSeparator()
         self.addAction(actions.save)
         self.addAction(actions.save_as)
+        self.addAction(actions.autosave_toggle)
+        self.addAction(actions.version_history)
         self.addSeparator()
         self.addAction(actions.imprt)
         self.addAction(actions.export)
@@ -160,6 +182,9 @@ class EditMenu(QMenu):
         self.addAction(actions.sort_ascending)
         self.addAction(actions.sort_descending)
         self.addSeparator()
+        self.addAction(actions.fill_down)
+        self.addAction(actions.fill_right)
+        self.addSeparator()
         self.addAction(actions.toggle_selection_mode)
         self.addSeparator()
         self.addAction(actions.shift_cells_down)
@@ -190,6 +215,8 @@ class ViewMenu(QMenu):
 
         super().__init__('&View', parent)
 
+        self.main_window = actions.parent
+
         self.addAction(actions.fullscreen)
         self.addAction(actions.toggle_gridheader_in_spreadsheet)
         self.addSeparator()
@@ -217,6 +244,33 @@ class ViewMenu(QMenu):
         self.addAction(actions.toggle_periodic_updates)
         self.addSeparator()
         self.addAction(actions.show_frozen)
+        self.addSeparator()
+
+        self.language_submenu = self.addMenu('&Language')
+        self.language_actions = {}
+        for code, name in LANGUAGES.items():
+            action = QAction(name, self)
+            action.setCheckable(True)
+            action.triggered.connect(partial(self.on_language, code))
+            self.language_submenu.addAction(action)
+            self.language_actions[code] = action
+
+    def update_language_menu(self):
+        """Checks the action of the active user interface language"""
+
+        language = self.main_window.settings.language
+        for code, action in self.language_actions.items():
+            action.setChecked(code == language)
+
+    def on_language(self, code: str, checked: bool = False):
+        """Switches the user interface language
+
+        :param code: Language code such as ``"hi"``
+        :param checked: Qt check state of the triggered action
+
+        """
+
+        self.main_window.set_language(code)
 
 
 class FormatMenu(QMenu):
@@ -257,6 +311,10 @@ class FormatMenu(QMenu):
         self.addSeparator()
 
         self.addAction(actions.merge_cells)
+        self.addSeparator()
+        self.addAction(actions.autofit_columns)
+        self.addAction(actions.autofit_rows)
+        self.addAction(actions.autofit_selection)
 
         self.addSeparator()
 
@@ -314,7 +372,25 @@ class MacroMenu(QMenu):
             self.addAction(actions.date)
             self.addAction(actions.time)
         self.addSeparator()
+        self.addAction(actions.insert_function)
         self.addAction(actions.insert_sum)
+
+
+class AIMenu(QMenu):
+    """AI menu for the main menubar"""
+
+    def __init__(self, parent: QWidget, actions: MainWindowActions):
+        """
+        :param parent: Parent widget
+        :param actions: Main window actions
+
+        """
+
+        super().__init__('&AI', parent)
+
+        self.addAction(actions.toggle_ai_dock)
+        self.addSeparator()
+        self.addAction(actions.ai_model)
 
 
 class HelpMenu(QMenu):
@@ -333,6 +409,7 @@ class HelpMenu(QMenu):
         self.addAction(actions.tutorial)
         self.addSeparator()
         self.addAction(actions.dependencies)
+        self.addAction(actions.ai_model)
         self.addSeparator()
         self.addAction(actions.about)
 
@@ -493,6 +570,7 @@ class HorizontalHeaderContextMenu(QMenu):
 
         self.addAction(actions.insert_columns)
         self.addAction(actions.delete_columns)
+        self.addAction(actions.autofit_columns)
 
 
 class VerticalHeaderContextMenu(QMenu):
@@ -508,6 +586,7 @@ class VerticalHeaderContextMenu(QMenu):
 
         self.addAction(actions.insert_rows)
         self.addAction(actions.delete_rows)
+        self.addAction(actions.autofit_rows)
 
 
 class TableChoiceContextMenu(QMenu):

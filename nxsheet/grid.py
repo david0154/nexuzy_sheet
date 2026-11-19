@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -42,6 +52,7 @@ Pyspread's main grid
 from ast import literal_eval
 from contextlib import contextmanager
 from datetime import datetime, date, time
+import itertools
 from io import BytesIO
 from typing import Any, Iterable, List, Tuple, Union
 
@@ -55,7 +66,7 @@ from PyQt6.QtWidgets \
 from PyQt6.QtGui \
     import (QColor, QBrush, QFont, QPainter, QPalette, QImage, QKeyEvent,
             QTextOption, QAbstractTextDocumentLayout, QTextDocument,
-            QWheelEvent, QContextMenuEvent, QTextCursor)
+            QWheelEvent, QContextMenuEvent, QTextCursor, QFontMetrics)
 from PyQt6.QtCore \
     import (Qt, QAbstractTableModel, QModelIndex, QVariant, QEvent, QSize,
             QRect, QRectF, QItemSelectionModel, QObject, QAbstractItemModel,
@@ -126,7 +137,7 @@ FONTSTYLES = (QFont.Style.StyleNormal,
 
 
 class Grid(QTableView):
-    """The main grid of pyspread"""
+    """The main grid of Nexuzy Sheet"""
 
     def __init__(self, main_window: QMainWindow, model=None):
         """
@@ -508,6 +519,25 @@ class Grid(QTableView):
               == QAbstractItemView.EditTrigger.NoEditTriggers):
             # Leave cell selection mode
             self.selection_mode = False
+        elif (event.modifiers() & Qt.KeyboardModifier.ControlModifier
+              and event.key() == Qt.Key.Key_Home):
+            # Excel: jump to the first cell
+            self.current = 0, 0, self.table
+        elif (event.modifiers() & Qt.KeyboardModifier.ControlModifier
+              and event.key() == Qt.Key.Key_End):
+            # Excel: jump to the last used cell
+            keys = [key for key in self.model.code_array.keys()
+                    if key[2] == self.table]
+            if keys:
+                self.current = (max(key[0] for key in keys),
+                                max(key[1] for key in keys), self.table)
+        elif (event.modifiers() & Qt.KeyboardModifier.ControlModifier
+              and event.key() == Qt.Key.Key_A):
+            # Excel: select the whole grid
+            self.selectAll()
+        elif event.key() == Qt.Key.Key_F2:
+            # Excel: edit the current cell in the entry line
+            self.main_window.entry_line.setFocus()
         else:
             super().keyPressEvent(event)
 
@@ -704,16 +734,85 @@ class Grid(QTableView):
                    if code_array(key))
         sum_list = [res for res in res_gen if res is not None]
 
-        msg_tpl = "     " + "     ".join(["Σ={}", "max={}", "min={}"])
+        msg_tpl = "     " + "     ".join(["Σ={}", "average={}", "count={}",
+                                         "max={}", "min={}"])
         msg = f"Selection: {len(selected_cell_list)} cells"
         if sum_list:
             try:
-                msg += msg_tpl.format(sum(sum_list), max(sum_list),
+                total = sum(sum_list)
+                msg += msg_tpl.format(total, total / len(sum_list),
+                                      len(sum_list), max(sum_list),
                                       min(sum_list))
             except Exception:
                 pass
 
         main_window.statusBar().showMessage(msg)
+
+    def on_fill_down(self):
+        """Fill down event handler
+
+        Copies the top cell of each selected column into the cells below it,
+        which follows the Excel <Ctrl+Shift+D> behaviour.
+
+        """
+
+        self._fill_selection("down")
+
+    def on_fill_right(self):
+        """Fill right event handler
+
+        Copies the leftmost cell of each selected row into the cells to its
+        right, which follows the Excel <Ctrl+Shift+R> behaviour.
+
+        """
+
+        self._fill_selection("right")
+
+    def _fill_selection(self, direction: str):
+        """Fills the selection from its first row or column
+
+        :param direction: Either 'down' or 'right'
+
+        """
+
+        selection = self.selection
+        shape = self.model.shape
+        code_array = self.model.code_array
+        table = self.table
+
+        try:
+            (top, left), (bottom, right) = selection.get_grid_bbox(shape)
+        except (AttributeError, ValueError):
+            self.main_window.statusBar().showMessage("No cell selection.")
+            return
+
+        codes = {}
+
+        if direction == "down":
+            if bottom <= top:
+                self.main_window.statusBar().showMessage(
+                    "Fill down: select at least two rows.")
+                return
+            for column in range(left, right + 1):
+                code = code_array((top, column, table))
+                for row in range(top + 1, bottom + 1):
+                    codes[row, column, table] = code
+        else:
+            if right <= left:
+                self.main_window.statusBar().showMessage(
+                    "Fill right: select at least two columns.")
+                return
+            for row in range(top, bottom + 1):
+                code = code_array((row, left, table))
+                for column in range(left + 1, right + 1):
+                    codes[row, column, table] = code
+
+        if not codes:
+            return
+
+        description = f"Fill selection {direction} for {len(codes)} cells"
+        command = commands.FillCells(self.model, codes, description)
+        self.main_window.undo_stack.push(command)
 
     def on_row_resized(self, row: int, old_height: float, new_height: float):
         """Row resized event handler
@@ -763,6 +862,128 @@ class Grid(QTableView):
                                            old_width / self.zoom,
                                            new_width / self.zoom, description)
         self.main_window.undo_stack.push(command)
+
+    def _table_cell_texts(self) -> List[Tuple[int, int, str, QFont]]:
+        """Returns row, column, text and font of cells with content
+
+        Only cells of the current table are inspected. The number of checked
+        cells is capped so that AutoFit stays responsive on large grids.
+
+        """
+
+        code_array = self.model.code_array
+        table = self.table
+        entries = []
+
+        for key in itertools.islice(code_array.keys(), 20000):
+            row, column, cell_table = key
+            if cell_table != table:
+                continue
+            try:
+                value = code_array[key]
+            except Exception:
+                continue
+            if value is None:
+                continue
+            text = str(value)
+            if not text:
+                continue
+            entries.append((row, column, text, self.model.font(key)))
+
+        return entries
+
+    def autofit_target_columns(self) -> List[int]:
+        """Returns the columns that AutoFit shall use"""
+
+        (_, left), (_, right) = self.selection.get_grid_bbox(self.model.shape)
+        if right > left:
+            return list(range(left, right + 1))
+        return [self.column]
+
+    def autofit_target_rows(self) -> List[int]:
+        """Returns the rows that AutoFit shall use"""
+
+        (top, _), (bottom, _) = self.selection.get_grid_bbox(self.model.shape)
+        if bottom > top:
+            return list(range(top, bottom + 1))
+        return [self.row]
+
+    def autofit_columns(self, columns: List[int] = None):
+        """Fits the width of columns to the content of their cells
+
+        :param columns: Columns to be fitted, defaults to the selection
+
+        """
+
+        if columns is None:
+            columns = self.autofit_target_columns()
+
+        columns = [column for column in columns
+                   if 0 <= column < self.model.shape[1]]
+        if not columns:
+            return
+
+        widths = {column: 0 for column in columns}
+        for _, column, text, font in self._table_cell_texts():
+            if column not in widths:
+                continue
+            metrics = QFontMetrics(font)
+            width = max(metrics.horizontalAdvance(line)
+                        for line in text.splitlines())
+            widths[column] = max(widths[column], width)
+
+        with self.undo_resizing_column():
+            for column in columns:
+                width = int(min(max(widths[column] + 24, 40), 2000))
+                self.model.code_array.col_widths[column, self.table] = width
+                self.setColumnWidth(column, int(width * self.zoom))
+
+        self.update_cell_spans()
+        self.viewport().update()
+        self.main_window.statusBar().showMessage(
+            f"AutoFit {len(columns)} column(s) to their content.")
+
+    def autofit_rows(self, rows: List[int] = None):
+        """Fits the height of rows to the wrapped content of their cells
+
+        :param rows: Rows to be fitted, defaults to the selection
+
+        """
+
+        if rows is None:
+            rows = self.autofit_target_rows()
+
+        rows = [row for row in rows if 0 <= row < self.model.shape[0]]
+        if not rows:
+            return
+
+        default_height = self.main_window.settings.default_row_height
+        heights = {row: 0 for row in rows}
+
+        for row, column, text, font in self._table_cell_texts():
+            if row not in heights:
+                continue
+            metrics = QFontMetrics(font)
+            available = max(int(self.columnWidth(column) / self.zoom) - 8, 20)
+            bounds = metrics.boundingRect(QRect(0, 0, available, 0),
+                                          Qt.TextFlag.TextWordWrap, text)
+            heights[row] = max(heights[row], bounds.height())
+
+        with self.undo_resizing_row():
+            for row in rows:
+                height = int(min(max(heights[row] + 8, default_height), 400))
+                self.model.code_array.row_heights[row, self.table] = height
+                self.setRowHeight(row, int(height * self.zoom))
+
+        self.viewport().update()
+        self.main_window.statusBar().showMessage(
+            f"AutoFit {len(rows)} row(s) to their content.")
+
+    def autofit_selection(self):
+        """Fits columns and rows of the selection to their content"""
+
+        self.autofit_columns()
+        self.autofit_rows()
 
     def on_zoom_in(self):
         """Zoom in event handler"""
@@ -1845,6 +2066,33 @@ class GridHeaderView(QHeaderView):
             painter.translate(rect.x()+1, rect.y()+1)
             painter.scale(zoom, zoom)
             super().paintSection(painter, unzoomed_rect, logicalIndex)
+
+    def mouseDoubleClickEvent(self, event):
+        """Overrides double click to fit a section to its content
+
+        Double clicking the border of a column or row header works like the
+        Excel AutoFit gesture.
+
+        :param event: Mouse event
+
+        """
+
+        position = event.position().toPoint()
+        index = self.logicalIndexAt(position)
+        if index >= 0:
+            start = self.sectionViewportPosition(index)
+            size = self.sectionSize(index)
+            point = (position.x()
+                     if self.orientation() == Qt.Orientation.Horizontal
+                     else position.y())
+            if abs(point - (start + size)) <= 4:
+                if self.orientation() == Qt.Orientation.Horizontal:
+                    self.grid.autofit_columns([index])
+                else:
+                    self.grid.autofit_rows([index])
+                return
+
+        super().mouseDoubleClickEvent(event)
 
     def contextMenuEvent(self, event: QContextMenuEvent):
         """Overrides contextMenuEvent

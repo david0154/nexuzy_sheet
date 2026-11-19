@@ -6,18 +6,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -26,10 +36,10 @@
 
 """
 
-pyspread
-========
+Nexuzy Sheet
+============
 
-- Main Python spreadsheet application
+- Excel-like Python spreadsheet application
 - Run this script to start the application.
 
 **Provides**
@@ -56,13 +66,13 @@ except ImportError:
     from main_window import MainWindow
 
 
-LICENSE = "GNU GENERAL PUBLIC LICENSE Version 3"
+LICENSE = "MIT License"
 
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 
 
 def excepthook(exception_type, exception_value, exception_traceback):
-    """Exception hook that prevents pyspread from crashing on exceptions"""
+    """Exception hook that prevents Nexuzy Sheet from crashing"""
 
     traceback_msg = "".join(traceback.format_exception(exception_type,
                                                        exception_value,
@@ -71,7 +81,7 @@ def excepthook(exception_type, exception_value, exception_traceback):
 
 
 def main():
-    """Pyspread main"""
+    """Nexuzy Sheet main"""
 
     sys.excepthook = excepthook
 
@@ -81,8 +91,27 @@ def main():
     logging.basicConfig(level=args.loglevel)
 
     app = QApplication(sys.argv)
+    app.setApplicationName("Nexuzy Sheet")
     app.setDesktopFileName("io.nexuzy.nexuzysheet")
+    app.setOrganizationName("Nexuzy Lab")
+
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "io.nexuzy.nexuzysheet")
+        except (AttributeError, OSError):
+            pass
+
+    try:
+        from nxsheet.icons import Icon
+    except ImportError:
+        from icons import Icon
+
+    app_icon = Icon.app_ico if sys.platform.startswith("win") else Icon.app
+    app.setWindowIcon(app_icon)
     main_window = MainWindow(args.file, default_settings=args.default_settings)
+    main_window.setWindowIcon(app_icon)
 
     main_window.show()
 

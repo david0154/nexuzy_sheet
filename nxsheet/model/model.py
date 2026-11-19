@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -25,7 +35,7 @@
 
 """
 
-The model contains the core data structures of pyspread and is divided
+The model contains the core data structures of Nexuzy Sheet and is divided
 into the following layers.
 
 - Layer 3: :class:`CodeArray`
@@ -118,6 +128,7 @@ try:
     from nxsheet.lib.selection import Selection
     from nxsheet.lib.string_helpers import ZEN
     from nxsheet.lib.parsers import spreadsheet_formula_to_code
+    from nxsheet.lib.excel_functions import EXCEL_FUNCTIONS
 except ImportError:
     from settings import Settings
     from lib.attrdict import AttrDict
@@ -127,6 +138,7 @@ except ImportError:
     from lib.selection import Selection
     from lib.string_helpers import ZEN
     from lib.parsers import spreadsheet_formula_to_code
+    from lib.excel_functions import EXCEL_FUNCTIONS
 
 
 class_format_functions = {}
@@ -1307,7 +1319,7 @@ class CodeArray(DataArray):
     # Cache for frozen objects
     frozen_cache = {}
 
-    # Safe mode: If True then Whether pyspread is operating in safe_mode
+    # Safe mode: If True then whether Nexuzy Sheet is operating in safe_mode
     # In safe_mode, cells are not evaluated but its code is returned instead.
     safe_mode = False
 
@@ -1418,6 +1430,11 @@ class CodeArray(DataArray):
             env_dict = {'S': self}
 
         env = globals().copy()
+        # Excel compatible functions such as SUM, AVERAGE or VLOOKUP.
+        # AutoSum and legacy workbooks may use Python's lowercase sum; give it
+        # the same empty-cell-safe behavior when evaluating spreadsheet cells.
+        env.update(EXCEL_FUNCTIONS)
+        env["sum"] = EXCEL_FUNCTIONS["SUM"]
         env.update(env_dict)
 
         return env
@@ -1512,7 +1529,7 @@ class CodeArray(DataArray):
         try:
             if code[0] == '=':
                 # FIXME: Somehow writing something like "=A5" as the first input,
-                #  makes pyspread compain "name 'Z' is not defined"
+                #  makes Nexuzy Sheet complain "name 'Z' is not defined"
                 code = spreadsheet_formula_to_code(code)
             result = self.exec_then_eval(code, env, {})
 
@@ -1582,7 +1599,8 @@ class CodeArray(DataArray):
                      'decimal', 'signal', 'Any', 'Dict', 'Iterable', 'List',
                      'NamedTuple', 'Sequence', 'Tuple', 'Union', '_R_', '_C_',
                      '_table_from_address', 'CellRange',
-                     'class_format_functions', 'spreadsheet_formula_to_code']
+                     'class_format_functions', 'spreadsheet_formula_to_code',
+                     'EXCEL_FUNCTIONS']
 
         try:
             from moneyed import Money

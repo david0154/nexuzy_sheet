@@ -1,9 +1,147 @@
-Changelog for pyspread
-======================
+Changelog for Nexuzy Sheet
+==========================
+
+Nexuzy Sheet is the Excel-like spreadsheet workspace by Nexuzy Lab
+(https://nexuzy.in). The project started as a fork of pyspread; the entries
+below 1.0 document the upstream history.
 
 Note: This changelog does not comprise development of pyspread for Python2
       It starts with the first Alpha release 1.99.0.0
 
+
+
+
+1.6.0
+-----
+
+AI knowledge, legal documents and release build.
+
+New features:
+ * The offline assistant is named Nexuzy AI and always identifies itself.
+ * Nexuzy AI knows the whole product: app name and version, company and
+   publisher, developers, official web app, website, source repository,
+   support address and workbook formats.
+ * Every prompt carries the complete built-in formula library - all 107
+   functions with signatures, and full descriptions for the functions named
+   in the request - so the assistant can explain formulas and stops inventing
+   unsupported ones. Questions about a formula are answered as text in the AI
+   panel.
+ * The context window grows from 2048 to 4096 tokens to fit the formula
+   reference.
+ * AI replies are now repaired instead of rejected: fenced JSON, a bare array
+   of rows, `data` given as a range or text, `[row, col]` cells, stray styles
+   and missing `=` in formulas are all normalized, so a valid answer no longer
+   surfaces as "not valid spreadsheet JSON".
+ * Packaging a release now ships THIRD_PARTY_LICENSES.md next to the
+   executable and inside the .deb documentation folder.
+
+Legal:
+ * Added docs/EULA.md, docs/TERMS_OF_SERVICE.md and docs/PRIVACY_POLICY.md.
+ * Added THIRD_PARTY_LICENSES.md with the bundled Qt, PyQt6, llama.cpp, Qwen
+   model and Python package licences plus compliance notes.
+ * Help -> About gained EULA, Terms and Privacy tabs and lists the AI name and
+   model; the License tab now points to the legal documents.
+
+1.5.0
+-----
+
+Offline AI and product information release.
+
+New features:
+ * AI prompts include Nexuzy Sheet product context, supported spreadsheet
+   features, Nexuzy Lab developer/publisher information, and official web and
+   GitHub links.
+ * About dialog lists the Nexuzy Sheet web app and source repository.
+ * AI-generated tables apply title and header cell formatting.
+ * Offline Qwen inference remains local and loads on demand.
+
+1.4
+---
+
+Excel-like workflow and template release.
+
+New features:
+ * Template gallery: File -> New from template inserts Invoice, Attendance
+   Register, General Ledger, Payroll Sheet or Budget Planning with values,
+   merged title areas and fitted column widths in one step.
+ * Excel style navigation: Ctrl+Home jumps to the first cell, Ctrl+End to the
+   last used cell, Ctrl+A selects the whole grid and F2 edits the current
+   cell in the entry line.
+ * Double clicking a row or column header border fits that section to its
+   content (AutoFit gesture).
+ * Help -> Offline AI model shows the model source URL, local path and status
+   and can start the download again.
+ * Recent files list extended from five to ten workbooks.
+ * Branding: company Nexuzy Lab, lead developers David and Manoj Konar.
+
+1.3
+---
+
+AutoFit, offline AI and branding release.
+
+New features:
+ * AutoFit for cells: Format -> AutoFit columns, AutoFit rows and
+   AutoFit selection size columns and rows to their content. The same
+   actions are available in the row and column header context menus.
+ * Offline AI assistant switched to Qwen2.5-0.5B-Instruct (GGUF Q4_K_M,
+   about 490 MB). The model is downloaded automatically on the first start
+   in the background and runs locally afterwards.
+ * The AI model download no longer blocks the start-up; the status bar shows
+   progress and result.
+ * Application icon handling: logo.png is the window icon, icon.ico is used
+   for the Windows executable and setup, and icon.icns is generated from
+   logo.png on macOS.
+ * Company branding updated to Nexuzy Lab (developer: David).
+   Support: support@nexuzy.in, information: info@nexuzy.in.
+ * AutoFit labels translated into all nine interface languages.
+
+1.2
+---
+
+Workbook, safety and internationalisation release.
+
+New features:
+ * Native workbook extension is now .nix (compressed). .nxl and .nxs remain
+   readable and can still be written.
+ * Auto save writes a recovery copy every 120 seconds while a workbook has
+   unsaved changes (File -> Auto save).
+ * Automatic backups after every save (newest 20 per workbook) plus a
+   File -> Version history dialog to restore or delete versions.
+ * Nine user interface languages with live switching in View -> Language:
+   English, Hindi, Bengali, Tamil, Spanish, French, Chinese, Russian and
+   Japanese.
+ * About dialog lists the languages, the native format and the data safety
+   features.
+ * .nix file association in the Windows, macOS and Linux installers, with a
+   shared MIME type definition for Linux packages.
+
+Documentation:
+ * Complete README, user guide (docs/GUIDE.md), verified feature status
+   (docs/FEATURES.md) and workbook format description
+   (docs/FILE_FORMAT.md).
+
+1.1
+---
+
+Excel-like feature release.
+
+New features:
+ * Excel compatible function library available in every cell with more than
+   100 functions such as SUM, AVERAGE, COUNT, IF, IFERROR, SUMIF, COUNTIF,
+   VLOOKUP, HLOOKUP, INDEX, MATCH, TEXT, CONCATENATE, TODAY, PMT, FV, PV,
+   IRR and TEXTJOIN.
+ * Fill down (Ctrl+Shift+D) and fill right (Ctrl+Shift+R) for selections.
+ * Insert function dialog with search and signatures (Shift+F3).
+ * Status bar now shows sum, average, count, max and min of the selection.
+ * About dialog with company, website, support and the full MIT license.
+
+Packaging:
+ * Complete installer generation for Windows, macOS and Linux
+   (Inno Setup, DMG, AppImage and deb) via build_installers.py.
+ * GitHub Actions workflow that builds all platform installers.
+
+License:
+ * Nexuzy Sheet is now released under the MIT License.
 
 2.5
 ---

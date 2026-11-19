@@ -6,18 +6,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -26,10 +36,10 @@
 
 """
 
-pyspread
-========
+Nexuzy Sheet
+============
 
-- Main Python spreadsheet application
+- Excel-like Python spreadsheet application
 - Run this script to start the application.
 
 **Provides**
@@ -41,13 +51,15 @@ pyspread
 
 from collections.abc import Iterable
 import os
+import threading
 from pathlib import Path
+import sys
 
 from PyQt6.QtCore import Qt, pyqtSignal, QEvent, QTimer, QRectF, QSize
 from PyQt6.QtGui import QColor, QFont, QPainter, QUndoStack, QPalette
 from PyQt6.QtWidgets import (QWidget, QMainWindow, QApplication,
                              QMessageBox, QDockWidget, QVBoxLayout,
-                             QStyleOptionViewItem, QSplitter)
+                             QStyleOptionViewItem, QSplitter, QProgressDialog)
 try:
     from PyQt6.QtSvgWidgets import QSvgWidget
 except ImportError:
@@ -55,7 +67,7 @@ except ImportError:
 from PyQt6.QtPrintSupport import QPrinter, QPrintDialog
 
 try:
-    from nxsheet.__init__ import VERSION, APP_NAME
+    from nxsheet.__init__ import AI_NAME, VERSION, APP_NAME
     from nxsheet.settings import Settings, WEB_URL, AUTHORS
     from nxsheet.icons import Icon, IconPath
     from nxsheet.grid import Grid, TableChoice
@@ -70,15 +82,19 @@ try:
     from nxsheet.widgets import Widgets
     from nxsheet.dialogs import (ApproveWarningDialog, PreferencesDialog,
                                   ManualDialog, TutorialDialog,
-                                  PrintAreaDialog, PrintPreviewDialog)
+                                  PrintAreaDialog, PrintPreviewDialog,
+                                  AboutDialog)
     from nxsheet.installer import DependenciesDialog
     from nxsheet.interfaces.pys import qt62qt5_fontweights
+    from nxsheet.autosave import AutoSaveManager, VersionHistoryDialog
+    from nxsheet import i18n
     from nxsheet.panels import MacroPanel
-    from nxsheet.ai.engine import NexuzyAIController
+    from nxsheet.ai.engine import (NexuzyAIController, QWEN_MODEL_URL,
+                                    QWEN_FILENAME)
     from nxsheet.lib.hashing import genkey
     from nxsheet.model.model import CellAttributes
 except ImportError:
-    from __init__ import VERSION, APP_NAME
+    from __init__ import AI_NAME, VERSION, APP_NAME
     from settings import Settings, WEB_URL, AUTHORS
     from icons import Icon, IconPath
     from grid import Grid, TableChoice
@@ -91,24 +107,33 @@ except ImportError:
     from workflows import Workflows
     from widgets import Widgets
     from dialogs import (ApproveWarningDialog, PreferencesDialog, ManualDialog,
-                         TutorialDialog, PrintAreaDialog, PrintPreviewDialog)
+                         TutorialDialog, PrintAreaDialog, PrintPreviewDialog,
+                         AboutDialog)
     from installer import DependenciesDialog
     from interfaces.pys import qt62qt5_fontweights
+    from autosave import AutoSaveManager, VersionHistoryDialog
+    import i18n
     from panels import MacroPanel
-    from ai.engine import NexuzyAIController
+    from ai.engine import NexuzyAIController, QWEN_MODEL_URL, QWEN_FILENAME
     from lib.hashing import genkey
     from model.model import CellAttributes
 
 
-LICENSE = "GNU GENERAL PUBLIC LICENSE Version 3"
+LICENSE = "MIT License"
 
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 
 
 class MainWindow(QMainWindow):
-    """Pyspread main window"""
+    """Nexuzy Sheet main window"""
 
     gui_update = pyqtSignal(dict)
+
+    #: Emitted with the AI setup result of the background model download
+    ai_stack_ready = pyqtSignal(dict)
+    #: Queued automatically when emitted from the AI setup worker thread.
+    ai_download_progress = pyqtSignal(str)
+    ai_action_ready = pyqtSignal(object)
 
     def __init__(self, filepath: Path = Path(),
                  default_settings: bool = False):
@@ -122,7 +147,7 @@ class MainWindow(QMainWindow):
 
         self.grid_header_spreadsheet_format = False
 
-        self._loading = True  # For initial loading of pyspread
+        self._loading = True  # For initial loading of Nexuzy Sheet
         self.prevent_updates = False  # Prevents setData updates in grid
 
         self.settings = Settings(self, reset_settings=default_settings)
@@ -147,6 +172,17 @@ class MainWindow(QMainWindow):
 
         self.apply_theme(self.settings.theme_mode)
         self.set_toolbar_icon_size(self.settings.toolbar_icon_size)
+
+        # User interface language
+        i18n.set_language(self.settings.language)
+        i18n.apply_to(self)
+        self.menuBar().update_language_menu()
+
+        # Auto save, automatic backups and version history
+        self.autosave = AutoSaveManager(self)
+        self.autosave.start()
+        self.main_window_actions.autosave_toggle.setChecked(
+            self.settings.autosave_enabled)
 
         # Print area for print requests
         self.print_area = None
@@ -184,7 +220,9 @@ class MainWindow(QMainWindow):
         """Initialize main window components"""
 
         self.setWindowTitle(APP_NAME)
-        self.setWindowIcon(Icon.pyspread)
+        window_icon = (Icon.app_ico if sys.platform.startswith("win")
+                       else Icon.app)
+        self.setWindowIcon(window_icon)
 
         # Safe mode widget
         self.safe_mode_widget = QSvgWidget(str(IconPath.safe_mode),
@@ -236,10 +274,16 @@ class MainWindow(QMainWindow):
 
         if event:
             event.ignore()
+
+        # Keep a recovery copy of unsaved changes before closing
+        autosave = getattr(self, "autosave", None)
+        if autosave is not None:
+            autosave.backup_on_close()
+
         self.workflows.file_quit()  # has @handle_changed_since_save decorator
 
     def dragEnterEvent(self, event: QEvent = None):
-        """Overloaded, accept the dragging of files into pyspread
+        """Overloaded, accept the dragging of files into Nexuzy Sheet
 
         :param event: Any QEvent
 
@@ -251,7 +295,7 @@ class MainWindow(QMainWindow):
             event.ignore()
 
     def dragMoveEvent(self, event: QEvent = None):
-        """Overloaded, accept the moving of files over pyspread
+        """Overloaded, accept the moving of files over Nexuzy Sheet
 
         :param event: Any QEvent
 
@@ -263,7 +307,7 @@ class MainWindow(QMainWindow):
             super().dragMoveEvent(event)
 
     def dropEvent(self, event: QEvent = None):
-        """Overloaded, catch the dropping of files into pyspread
+        """Overloaded, catch the dropping of files into Nexuzy Sheet
 
         :param event: Any QEvent
 
@@ -303,11 +347,11 @@ class MainWindow(QMainWindow):
 
         self.main_panel = QWidget(self)
 
-        self.ai_controller = NexuzyAIController(base_dir=str(Path.home() / ".nexuzy_sheet"))
-        try:
-            self.ai_controller.ensure_local_stack()
-        except Exception:
-            pass
+        self.ai_controller = NexuzyAIController(
+            base_dir=str(Path.home() / ".nexuzy_sheet"))
+        self.ai_stack_ready.connect(self.on_ai_stack_ready)
+        self.ai_download_progress.connect(self.on_ai_download_progress)
+        self.ai_action_ready.connect(self.on_ai_action_ready)
 
         self.entry_line_dock = QDockWidget("Entry Line", self)
         self.entry_line_dock.setObjectName("Entry Line Panel")
@@ -496,13 +540,29 @@ class MainWindow(QMainWindow):
                 self.grid.model.setData([self.grid.model.index(start_row + top, start_col + left)], attr, Qt.ItemDataRole.DecorationRole)
 
         if styles:
-            for row_index, row in enumerate(table):
-                for col_index, value in enumerate(row):
-                    if value is None:
-                        continue
-                    if row_index == styles.get("title_row", -1):
-                        cell = self.grid.model.index(start_row + row_index, start_col + col_index)
-                        self.grid.model.setData(cell, value, Qt.ItemDataRole.EditRole, raw=True)
+            from nxsheet.lib.attrdict import AttrDict
+            from nxsheet.lib.selection import Selection
+            from nxsheet.model.model import CellAttribute
+
+            style_map = {
+                "title_row": {"bgcolor": (31, 78, 121), "textcolor": (255, 255, 255), "fontweight": 75, "pointsize": 16},
+                "header_row": {"bgcolor": (217, 225, 242), "fontweight": 75},
+            }
+            for style_key, row_styles in style_map.items():
+                row_index = styles.get(style_key)
+                if isinstance(row_index, int) and 0 <= row_index < len(table):
+                    row_width = len(table[row_index])
+                    if row_width:
+                        selection = Selection(
+                            [(start_row + row_index, start_col)],
+                            [(start_row + row_index, start_col + row_width - 1)],
+                            [], [], [],
+                        )
+                        attr = CellAttribute(
+                            selection, self.grid.table, AttrDict(row_styles))
+                        self.grid.model.setData(
+                            [], attr, Qt.ItemDataRole.DecorationRole)
+            self.grid.model.safe_data_changed()
 
     def on_ai_submit(self):
         """Submit a user command and apply the returned action to the spreadsheet."""
@@ -511,15 +571,54 @@ class MainWindow(QMainWindow):
         if not question:
             return
 
-        # Note: No longer auto-installing packages to avoid blocking the UI
-        # Users can install optional AI dependencies manually if needed
+        # Product and formula questions are answered exactly, without the model.
+        direct = self.ai_controller.direct_answer(question)
+        if direct is not None:
+            self.ai_output.setPlainText(direct)
+            return
 
-        action = self.ai_controller.handle_text_request(question, {
-            "sheet": {
-                "current_cell": self.grid.current,
-                "table": self.grid.table,
-            }
-        })
+        manager = self.ai_controller.model_manager
+        if not manager.model_ready() or not manager.llama_runtime_ready:
+            self.ai_output.setPlainText(
+                "The offline AI model is being prepared; this happens only "
+                "once. Submit the request again when the download finishes.")
+            self.start_ai_setup()
+            return
+
+        sheet_data = []
+        code_array = self.grid.model.code_array
+        current_row, current_col, current_table = self.grid.current
+        active_cell = self.grid.current
+        active_table = self.grid.table
+        for row in range(max(0, current_row - 10), min(code_array.shape[0], current_row + 11)):
+            values = []
+            for col in range(max(0, current_col - 5), min(code_array.shape[1], current_col + 6)):
+                value = code_array[row, col, current_table]
+                values.append(value if isinstance(value, (str, int, float, bool)) or value is None else str(value)[:200])
+            sheet_data.append(values)
+
+        self.ai_submit.setEnabled(False)
+        self.ai_output.setPlainText("Loading offline Qwen and generating a spreadsheet action...")
+
+        def worker():
+            try:
+                action = self.ai_controller.handle_text_request(question, {
+                    "sheet": {
+                        "current_cell": active_cell,
+                        "table": active_table,
+                        "data": sheet_data,
+                    }
+                })
+            except Exception as exc:
+                from nxsheet.ai.engine import AIAction
+                action = AIAction(action="error",
+                              explanation=f"{AI_NAME} failed: {exc}")
+            self.ai_action_ready.emit(action)
+
+        threading.Thread(target=worker, daemon=True, name="nexuzy-ai-request").start()
+
+    def on_ai_action_ready(self, action):
+        self.ai_submit.setEnabled(True)
 
         if action.action == "formula" and action.formula and action.cell:
             row, col = self._cell_ref_to_index(action.cell)
@@ -527,7 +626,7 @@ class MainWindow(QMainWindow):
             self.grid.model.setData(index, action.formula, Qt.ItemDataRole.EditRole, raw=True)
             self.ai_output.setPlainText(
                 f"Formula written to {action.cell}: {action.formula}. "
-                "The app is using the built-in local fallback engine."
+                f"Generated with {AI_NAME}."
             )
         elif action.action == "import_table" and action.data:
             self._insert_table(action.data, action.cell or "A1", merged_cells=getattr(action, "merged_cells", None), styles=getattr(action, "styles", None))
@@ -537,18 +636,7 @@ class MainWindow(QMainWindow):
         else:
             message = action.explanation or f"AI action: {action.action}"
             if action.action in {"find", "error"}:
-                runtime_status = self.ai_controller.ensure_local_stack()
-                has_model = bool(runtime_status.get("runtime", {}).get("qwen_model", False))
-                if not has_model:
-                    message = (
-                        "Local AI fallback is active. "
-                        "No model is auto-downloaded, so the built-in spreadsheet action engine is handling the request."
-                    )
-                else:
-                    message = (
-                        action.explanation or
-                        "The AI request did not produce a spreadsheet action."
-                    )
+                message = action.explanation or f"Qwen action: {action.action}"
             self.ai_output.setPlainText(message)
 
         self.ai_input.clear()
@@ -886,17 +974,33 @@ class MainWindow(QMainWindow):
     def on_fullscreen(self):
         """Fullscreen toggle event handler"""
 
-        if self.windowState() == Qt.WindowState.WindowFullScreen:
-            self.setWindowState(self._previous_window_state)
+        if self.windowState() & Qt.WindowState.WindowFullScreen:
+            previous_state = getattr(
+                self, "_previous_window_state", Qt.WindowState.WindowNoState)
+            if previous_state & Qt.WindowState.WindowMaximized:
+                self.showMaximized()
+            elif previous_state & Qt.WindowState.WindowMinimized:
+                self.showMinimized()
+            else:
+                self.showNormal()
             for widget_name in self.settings.widget_names[1:]:
                 widget = getattr(self, widget_name)
-                widget.setVisible(self._previous_visibility[widget_name])
-            self.menuBar().show()
-            self.table_choice.show()
-            self.statusBar().show()
+                widget.setVisible(
+                    getattr(self, "_previous_visibility", {}).get(
+                        widget_name, True))
+            visibility = getattr(self, "_previous_visibility", {})
+            self.menuBar().setVisible(visibility.get("menu_bar", True))
+            self.table_choice.setVisible(
+                visibility.get("table_choice", True))
+            self.statusBar().setVisible(
+                visibility.get("status_bar", True))
         else:
             self._previous_window_state = self.windowState()
-            self._previous_visibility = {}
+            self._previous_visibility = {
+                "menu_bar": self.menuBar().isVisible(),
+                "table_choice": self.table_choice.isVisible(),
+                "status_bar": self.statusBar().isVisible(),
+            }
             for widget_name in self.settings.widget_names[1:]:
                 widget = getattr(self, widget_name)
                 self._previous_visibility[widget_name] = widget.isVisible()
@@ -908,10 +1012,17 @@ class MainWindow(QMainWindow):
             self.setWindowState(Qt.WindowState.WindowFullScreen)
 
     def on_approve(self):
-        """Approve event handler"""
+        """Approve the currently open workbook after explicit confirmation."""
+
+        if not self.safe_mode:
+            return
 
         if ApproveWarningDialog(self).choice:
             self.safe_mode = False
+            self.grid.model.safe_data_changed()
+            self.settings.changed_since_save = True
+            self.statusBar().showMessage(
+                "Workbook approved. Save it to trust it next time.")
 
     def on_clear_globals(self):
         """Clear globals event handler"""
@@ -1152,60 +1263,190 @@ class MainWindow(QMainWindow):
             yield line.strip()
 
     def on_about(self):
-        """Show about message box"""
+        """Show about dialog with company, website and MIT license"""
 
-        about_msg = f"""
-            <h3 style="margin: 0 0 8px;">NEXUZY SHEET</h3>
-            <p><b>Professional Spreadsheet &amp; Data Workspace</b></p>
-            <p><b>Version:</b> {VERSION}<br>
-               <b>Build:</b> 2026.08<br>
-               <b>Platform:</b> Windows 10 / Windows 11<br>
-               <b>Architecture:</b> 64-bit</p>
+        dialog = AboutDialog(self)
+        dialog.exec()
 
-            <p><b>About the Application</b><br>
-               <b>Nexuzy Sheet</b> is a modern spreadsheet and data-management application developed by <b>Nexuzy Lab</b>.<br>
-               It is designed for students, professionals, businesses, developers, analysts, and everyday users who need a flexible environment for creating, editing, calculating, analyzing, and presenting data.</p>
+    def start_ai_setup(self):
+        """Explicitly downloads or verifies the offline model in background."""
 
-            <p><b>Core Features</b><br>
-               • Advanced spreadsheet workspace<br>
-               • Multiple worksheets and workbooks<br>
-               • Powerful formulas and functions<br>
-               • Charts and data visualization<br>
-               • Tables and structured data<br>
-               • Search and replace<br>
-               • Sorting and filtering<br>
-               • Cell formatting and styles<br>
-               • Conditional formatting<br>
-               • Freeze rows and columns<br>
-               • XLSX, XLS, ODS and CSV support<br>
-               • Open, edit and save spreadsheet files<br>
-               • Undo and redo<br>
-               • Keyboard shortcuts<br>
-               • Data validation and spreadsheet tools<br>
-               • Data analysis tools</p>
+        if getattr(self, "_ai_setup_running", False):
+            self.statusBar().showMessage("Offline AI model setup is already running.")
+            return
 
-            <p><b>Developed By</b><br>
-               <b>Nexuzy Lab</b><br>
-               <b>Lead Developer:</b> David / Manoj</p>
+        self._ai_setup_running = True
+        self._ai_download_percent = 0
+        self.statusBar().showMessage("Starting offline AI model setup...")
+        self._ai_progress_dialog = QProgressDialog(
+            "Connecting to Hugging Face and preparing the download...", "",
+            0, 0, self)
+        self._ai_progress_dialog.setWindowTitle("Downloading AI model")
+        self._ai_progress_dialog.setCancelButton(None)
+        self._ai_progress_dialog.setMinimumDuration(0)
+        self._ai_progress_dialog.setWindowModality(
+            Qt.WindowModality.WindowModal)
+        self._ai_progress_dialog.show()
 
-            <p><b>Official Website</b><br>
-               <a href="{WEB_URL}">{WEB_URL}</a></p>
+        def worker():
+            """Downloads or verifies the local model"""
 
-            <p><b>Support</b><br>
-               <a href="mailto:support@nexuzy.in">support@nexuzy.in</a></p>
+            try:
+                def progress_callback(msg: str):
+                    self.ai_download_progress.emit(msg)
 
-            <p><b>Developer Contact</b><br>
-               <a href="mailto:david@nexuzy.in">david@nexuzy.in</a><br>
-               <a href="mailto:manoj@manojkonar.in">manoj@manojkonar.in</a></p>
+                result = self.ai_controller.ensure_local_stack(
+                    progress_callback=progress_callback
+                )
+            except Exception as error:  # Never break the UI on AI setup
+                result = {"error": str(error)}
+            self.ai_stack_ready.emit(result or {})
 
-            <p><b>Product Identity</b><br>
-               <b>Product:</b> Nexuzy Sheet<br>
-               <b>Developer:</b> Nexuzy Lab<br>
-               <b>Website:</b> nexuzy.in<br>
-               <b>Release:</b> 2026</p>
+        try:
+            thread = threading.Thread(target=worker, daemon=True,
+                                      name="nexuzy-ai-setup")
+            thread.start()
+        except Exception as error:
+            self._ai_setup_running = False
+            self.statusBar().showMessage(
+                f"Could not start offline AI setup: {error}", 30000)
+
+    def on_ai_download_progress(self, message: str):
+        """Update download status and progress on the GUI thread."""
+        self.statusBar().showMessage(message)
+        dialog = getattr(self, "_ai_progress_dialog", None)
+        if dialog is None:
+            return
+
+        dialog.setLabelText(message)
+        if message.startswith("Downloading") and message.rstrip().endswith("%"):
+            try:
+                percent = int(message.rsplit(":", 1)[1].strip().rstrip("%"))
+            except ValueError:
+                return
+            if dialog.minimum() == dialog.maximum():
+                dialog.setRange(0, 100)
+            self._ai_download_percent = max(
+                self._ai_download_percent, min(percent, 100))
+            dialog.setValue(self._ai_download_percent)
+
+    def on_ai_stack_ready(self, result: dict):
+        """Shows the result of the offline AI model setup
+
+        :param result: Result dictionary of the AI controller
+
         """
 
-        QMessageBox.about(self, f"About {APP_NAME}", about_msg)
+        self._ai_setup_running = False
+        dialog = getattr(self, "_ai_progress_dialog", None)
+        if dialog is not None:
+            dialog.close()
+            self._ai_progress_dialog = None
+        model = (result or {}).get("model", {}) or {}
+        status = model.get("status")
+        runtime_download = (result or {}).get("runtime_download", {}) or {}
+        if runtime_download.get("status") == "error":
+            message = ("Offline AI runtime download failed: "
+                       + str(runtime_download.get("error", "Unknown error")))
+            self.statusBar().showMessage(message, 30000)
+            QMessageBox.warning(self, "AI runtime download failed", message)
+            return
+
+        if status == "downloading":
+            self.statusBar().showMessage("Starting offline AI model download...")
+            return
+
+        if status in ("ready", "downloaded"):
+            message = ("Offline AI assistant ready: "
+                       "Qwen2.5-0.5B-Instruct with llama.cpp")
+            self.statusBar().showMessage(message, 20000)
+        elif status == "error":
+            message = "Offline AI model download failed: " + str(
+                model.get("error", "Unknown download error"))
+            self.statusBar().showMessage(message, 30000)
+            QMessageBox.warning(self, "AI model download failed", message)
+        elif status == "manual_required":
+            self.statusBar().showMessage(
+                "Offline AI model download did not start; retry from Help → "
+                "Offline AI model.", 30000)
+        elif (result or {}).get("error"):
+            message = ("Offline AI assistant unavailable: "
+                       f"{result['error']}")
+            self.statusBar().showMessage(message, 30000)
+            QMessageBox.warning(self, "AI model setup failed", message)
+        else:
+            message = ("Offline AI assistant runs without the local model; "
+                       "spreadsheet actions still work.")
+            self.statusBar().showMessage(message, 20000)
+
+    def on_ai_model_info(self):
+        """Shows the offline AI model source, path and download option"""
+
+        manager = self.ai_controller.model_manager
+        installed = ("installed" if manager.model_ready()
+                     else "not downloaded yet")
+        text = (
+            f"{AI_NAME} - offline AI assistant\n\n"
+            f"Product: {APP_NAME} {VERSION}\n"
+            "Model: Qwen2.5-0.5B-Instruct (GGUF Q4_K_M)\n"
+            "Known formulas: the complete built-in function library\n"
+            "Size: about 491 MB\n"
+            f"Source: {QWEN_MODEL_URL}\n"
+            f"Local file: {manager.qwen_gguf}\n"
+            f"File name: {QWEN_FILENAME}\n"
+            f"Status: {installed}\n\n"
+            "The model is downloaded only when you choose Download now and "
+            "it is not already present. The llama.cpp inference runtime "
+            "(about 25 MB) is installed alongside it. The model is loaded "
+            "when you submit a prompt. "
+            "Download requires an internet connection and about 500 MB of free space. "
+            "No account or API key is required.")
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Offline AI model")
+        box.setText(text)
+        download_button = box.addButton(
+            "Download now", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Close)
+        box.exec()
+
+        if box.clickedButton() is download_button:
+            self.start_ai_setup()
+
+    def on_toggle_autosave(self, checked: bool):
+        """Enables or disables the automatic recovery copies
+
+        :param checked: Check state of the Auto save action
+
+        """
+
+        self.settings.autosave_enabled = bool(checked)
+        self.autosave.restart()
+        state = "enabled" if checked else "disabled"
+        self.statusBar().showMessage(f"Auto save {state}.")
+
+    def on_version_history(self):
+        """Shows the auto save recovery copies and automatic backups"""
+
+        dialog = VersionHistoryDialog(self)
+        dialog.exec()
+
+    def set_language(self, code: str):
+        """Switches the user interface language
+
+        :param code: Language code such as ``"hi"`` or ``"ja"``
+
+        """
+
+        if code not in i18n.LANGUAGES:
+            return
+
+        self.settings.language = code
+        i18n.set_language(code)
+        i18n.apply_to(self)
+        self.menuBar().update_language_menu()
+        self.statusBar().showMessage(
+            f"Language: {i18n.language_name(code)}")
 
     def on_focus_changed(self, old: QWidget, now: QWidget):
         """Handles grid clicks from entry line"""

@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -40,9 +50,13 @@ except ImportError:
     # Python 3.6 compatibility
     from nxsheet.lib.dataclasses import dataclass
 import os
+import sys
 
-from importlib.metadata import version as version__
-from importlib.metadata import PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, distributions, version as version__
+try:
+    from importlib.metadata import packages_distributions
+except ImportError:
+    packages_distributions = None
 
 from PyQt6.QtCore import QProcess, QSize
 from PyQt6.QtGui import QFont, QTextCursor
@@ -65,6 +79,35 @@ except ImportError:
     from lib.attrdict import AttrDict
 
 
+#: Distribution names whose import name differs from the distribution name.
+#: Without this map ``python-dateutil`` is looked up as ``python_dateutil``
+#: and reported as not installed even though it is available.
+MODULE_NAMES = {
+    "python-dateutil": "dateutil",
+    "py-moneyed": "moneyed",
+    "pyenchant": "enchant",
+    "plotnine": "plotnine",
+    "pycel": "pycel",
+    "rpy2": "rpy2",
+    "scikit-learn": "sklearn",
+    "beautifulsoup4": "bs4",
+}
+
+MODULE_VERSION_ATTRS = {
+    "PyQt6": "PYQT_VERSION_STR",
+    "numpy": "__version__",
+    "markdown2": "__version__",
+    "matplotlib": "__version__",
+    "openpyxl": "__version__",
+    "plotnine": "__version__",
+    "pycel": "__version__",
+    "python-dateutil": "__version__",
+    "pyenchant": "__version__",
+    "py-moneyed": "__version__",
+    "rpy2": "__version__",
+}
+
+
 @dataclass
 class Module:
     """Module checker"""
@@ -75,11 +118,108 @@ class Module:
 
     @property
     def version(self) -> version:
-        """Currently installed version number, False if not installed"""
+        """Return the installed package version, or None if absent."""
 
         try:
             return version.parse(version__(self.name))
         except PackageNotFoundError:
+            module_version = self._module_version()
+            if module_version is not None:
+                return module_version
+            bundled_version = self._bundled_version()
+            if bundled_version is not None:
+                return bundled_version
+            return self._frozen_module_version()
+
+    def _module_version(self) -> version:
+        """Returns version from the imported module, None if unavailable"""
+
+        distribution = self.name.split("[")[0]
+        candidates = []
+        if distribution in MODULE_NAMES:
+            candidates.append(MODULE_NAMES[distribution])
+        candidates.append(distribution.replace("-", "_"))
+        candidates.append(distribution.lower().replace("-", "_"))
+
+        module = None
+        module_name = distribution.replace("-", "_")
+        for candidate in candidates:
+            try:
+                module = __import__(candidate)
+            except Exception:
+                continue
+            module_name = candidate
+            break
+
+        if module is None:
+            return
+
+        module_version = getattr(
+            module, MODULE_VERSION_ATTRS.get(self.name, "__version__"), None)
+
+        if module_version is None and module_name == "PyQt6":
+            try:
+                from PyQt6.QtCore import PYQT_VERSION_STR
+                module_version = PYQT_VERSION_STR
+            except ImportError:
+                return
+
+        if module_version is None:
+            return self._distribution_version_from_import_name(module_name)
+
+        if module_version is None and module_name == "PyQt6":
+            try:
+                from PyQt6.QtCore import PYQT_VERSION_STR
+                module_version = PYQT_VERSION_STR
+            except ImportError:
+                return
+
+        try:
+            return version.parse(str(module_version))
+        except ValueError:
+            return self._distribution_version_from_import_name(module_name)
+
+    def _distribution_version_from_import_name(self, module_name: str):
+        """Resolve a distribution version through its top-level import name."""
+        if packages_distributions is None:
+            return
+        try:
+            names = packages_distributions().get(module_name, [])
+            for name in names:
+                try:
+                    return version.parse(version__(name))
+                except PackageNotFoundError:
+                    continue
+        except (ImportError, OSError, ValueError):
+            return
+
+    def _bundled_version(self) -> version:
+        """Find version information retained in a frozen application."""
+        if not getattr(sys, "frozen", False):
+            return
+
+        try:
+            for distribution in distributions():
+                if distribution.metadata.get("Name", "").lower() == self.name.lower():
+                    return version.parse(distribution.version)
+        except Exception:
+            return
+
+    def _frozen_module_version(self) -> version:
+        """Resolve package versions from PyInstaller's bundled imports."""
+        if not getattr(sys, "frozen", False):
+            return
+        module_name = MODULE_NAMES.get(self.name, self.name.replace("-", "_"))
+        try:
+            module = __import__(module_name)
+        except Exception:
+            return
+        value = getattr(module, MODULE_VERSION_ATTRS.get(self.name, "__version__"), None)
+        if value is None:
+            return self._distribution_version_from_import_name(module_name)
+        try:
+            return version.parse(str(value))
+        except ValueError:
             return
 
     def is_installed(self) -> bool:
@@ -210,9 +350,6 @@ class DependenciesDialog(QDialog):
             if module.is_installed():
                 status = "Installed"
                 bold = False
-            elif module.is_installed() is None:
-                status = "pkg_resources is missing"
-                bold = True
             else:
                 status = "Not installed"
                 bold = True

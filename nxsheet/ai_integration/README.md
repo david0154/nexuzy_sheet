@@ -1,6 +1,17 @@
 # Nexuzy Sheet AI Integration
 
-Lightweight, local AI for spreadsheet operations.
+Lightweight, local AI for spreadsheet operations. Nexuzy Sheet is a desktop
+spreadsheet application developed and published by Nexuzy Lab. The desktop
+app's supported offline assistant is implemented in `nxsheet/ai/engine.py`
+with Qwen2.5-0.5B-Instruct GGUF through `ctransformers`; it creates structured
+formula/table actions and receives limited nearby workbook context. It does
+not execute generated Python. The current app links are
+<https://sheet.nexuzy.in> and <https://github.com/david0154/nexuzy_sheet>.
+
+This directory contains an experimental integration layer, not the runtime
+used by the shipped desktop AI panel. Its OCR and coordinator examples are not
+wired into the desktop prompt flow; do not infer that they are included in the
+installer or available as working app features.
 
 ## Overview
 
@@ -8,12 +19,13 @@ Nexuzy Sheet AI consists of four focused components:
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| **Brain** | Qwen3-0.6B (GGUF Q4 + llama.cpp) | Understand commands, generate formulas, lightweight reasoning |
+| **Brain** | Qwen2.5-0.5B-Instruct (GGUF Q4 + llama.cpp) | Understand commands, generate formulas, lightweight reasoning |
 | **OCR** | PaddleOCR PP-OCRv6 Tiny | Read text/numbers from images and documents |
 | **Image Prep** | OpenCV | Deskew, denoise, crop, perspective correction |
 | **PDF Reading** | PyMuPDF | Extract text/images/pages from PDFs |
 
-**No cloud APIs. No large models. Everything runs locally and offline.**
+**No cloud APIs. Model inference is local. Qwen model weights must be
+explicitly downloaded by the user; no AI model is bundled in the installer.**
 
 ---
 
@@ -22,10 +34,10 @@ Nexuzy Sheet AI consists of four focused components:
 ### 1. Install AI Dependencies
 
 ```bash
-pip install llama-cpp-python paddleocr opencv-python pymupdf numpy
+pip install -r nxsheet/optional_ai_requirements.txt
 ```
 
-### 2. Download Qwen3-0.6B Model
+### 2. Download Qwen2.5-0.5B-Instruct Model
 
 The model (512 MB GGUF Q4 quantized) must be downloaded once:
 
@@ -34,14 +46,14 @@ from pyspread.ai_integration import AICoordinator
 
 coordinator = AICoordinator()
 # TODO: Implement model download functionality
-# coordinator.download_model("qwen3-0.6b")
+# coordinator.download_model("qwen2.5-0.5b-instruct")
 ```
 
 For now, download manually from:
-- Hugging Face: `qwen/Qwen3-0.6B-GGUF`
-- Modelscope: Qwen3-0.6B
+- Hugging Face: `qwen/Qwen2.5-0.5B-Instruct-GGUF`
+- Modelscope: Qwen2.5-0.5B-Instruct
 
-Place in `~/.nexuzy_sheet/ai_models/qwen3-0.6b.gguf`
+Place in `~/.nexuzy_sheet/ai_models/qwen2.5-0.5b-instruct.gguf`
 
 ### 3. First-Run Initialization
 
@@ -265,7 +277,7 @@ class MainWindow:
 
 ## System Prompt
 
-The Qwen3-0.6B model operates under this system prompt (constrains output):
+The Qwen2.5-0.5B-Instruct model operates under this system prompt (constrains output):
 
 ```
 You are Nexuzy Sheet AI, an assistant for spreadsheet operations.
@@ -284,7 +296,7 @@ Keep explanations clear and concise.
 
 | Component | Time | Memory |
 |-----------|------|--------|
-| Qwen3-0.6B | 1-3s per command | ~1 GB |
+| Qwen2.5-0.5B-Instruct | 1-3s per command | ~490 MB |
 | PaddleOCR | 0.5-2s per image | ~500 MB |
 | OpenCV preprocessing | 100-500ms | ~100 MB |
 | PyMuPDF | 50-200ms per page | ~50 MB |
@@ -305,7 +317,7 @@ Solution: pip install opencv-python
 ### Model not found
 
 ```
-Error: Model not found: ~/.nexuzy_sheet/ai_models/qwen3-0.6b.gguf
+Error: Model not found: ~/.nexuzy_sheet/ai_models/qwen2.5-0.5b-instruct.gguf
 Solution: Download from Hugging Face and place in that directory
 ```
 
@@ -353,7 +365,7 @@ Solution: pip install paddleocr
 
 ```toml
 [ai-dependencies]
-llama-cpp-python = ">=0.2.0"      # Qwen3 inference
+llama-cpp-python = ">=0.2.0"      # Qwen2.5 inference
 paddleocr = ">=2.8.0"             # PP-OCRv6 Tiny
 opencv-python = ">=4.8.0"         # Image preprocessing
 pymupdf = ">=1.23.0"              # PDF handling
@@ -364,7 +376,7 @@ numpy = ">=1.24.0"                # Numerical operations
 
 ## License
 
-Same as Nexuzy Sheet: GNU General Public License v3.0
+Same as Nexuzy Sheet: MIT License
 
 ---
 

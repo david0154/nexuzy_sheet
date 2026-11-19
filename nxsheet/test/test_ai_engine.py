@@ -16,15 +16,67 @@ def _app():
     return app
 
 
-def test_ai_controller_generates_formula_action(tmp_path):
+def test_ai_controller_reports_missing_offline_model(tmp_path):
     _app()
     controller = NexuzyAIController(base_dir=str(tmp_path))
 
     action = controller.handle_text_request("Add GST of 18% to B5")
 
-    assert action.action == "formula"
-    assert action.formula == "=B5*1.18"
-    assert action.cell == "B5"
+    assert action.action == "error"
+    assert "Download" in action.explanation
+
+
+def test_qwen_reasoner_parses_import_table_action(tmp_path):
+    controller = NexuzyAIController(base_dir=str(tmp_path))
+    payload = controller.reasoner._parse_response(
+        '{"action":"import_table","cell":"A1","data":[["Name","Amount"],["Sales",10]]}'
+    )
+
+    assert payload["action"] == "import_table"
+    assert payload["data"][1][1] == 10
+
+
+def test_qwen_reasoner_rejects_executable_or_invalid_response(tmp_path):
+    controller = NexuzyAIController(base_dir=str(tmp_path))
+
+    payload = controller.reasoner._parse_response("print('do something')")
+
+    assert payload["action"] == "error"
+
+
+def test_ai_prompt_includes_product_and_developer_context(tmp_path):
+    controller = NexuzyAIController(base_dir=str(tmp_path))
+    prompt = controller.reasoner.prompt("What is this app?")
+
+    assert "Nexuzy Lab" in prompt
+    assert "https://sheet.nexuzy.in" in prompt
+    assert "https://github.com/david0154/nexuzy_sheet" in prompt
+    assert "formula" in prompt
+
+
+def test_ai_table_title_and_header_styles_use_visible_cell_attributes():
+    _app()
+    from nxsheet.main_window import MainWindow
+
+    window = MainWindow()
+    start_row, start_col = 20, 4
+    window._insert_table(
+        [["Quarterly Report", ""], ["Item", "Sales"], ["Tea", 42]],
+        "E21",
+        styles={"title_row": 0, "header_row": 1},
+    )
+
+    attrs = window.grid.model.code_array.cell_attributes
+    title = attrs[(start_row, start_col, window.grid.table)]
+    title_next = attrs[(start_row, start_col + 1, window.grid.table)]
+    header = attrs[(start_row + 1, start_col + 1, window.grid.table)]
+
+    assert title.bgcolor == (31, 78, 121)
+    assert title.textcolor == (255, 255, 255)
+    assert title.fontweight == 75
+    assert title_next.bgcolor == (31, 78, 121)
+    assert header.bgcolor == (217, 225, 242)
+    assert header.fontweight == 75
 
 
 def test_main_window_has_ai_dock():

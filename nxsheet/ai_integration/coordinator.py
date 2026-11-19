@@ -6,7 +6,7 @@
 AI Coordinator
 
 Central hub that manages all AI components:
-- Qwen3-0.6B (text/reasoning)
+- Qwen2.5-0.5B-Instruct (text/reasoning)
 - PaddleOCR (document reading)
 - OpenCV (image preprocessing)
 - PyMuPDF (PDF handling)
@@ -68,10 +68,10 @@ class AICoordinator:
             logger.info("All AI dependencies installed")
         
         # Check models
-        if self.config.is_model_downloaded("qwen3-0.6b"):
-            logger.info("Qwen3-0.6B model available")
+        if self.config.is_model_downloaded("qwen2.5-0.5b-instruct"):
+            logger.info("Qwen2.5-0.5B-Instruct model available")
         else:
-            logger.warning("Qwen3-0.6B model not downloaded")
+            logger.warning("Qwen2.5-0.5B-Instruct model not downloaded")
     
     def initialize_async(self, progress_callback=None):
         """
@@ -93,7 +93,7 @@ class AICoordinator:
                 log_progress("Install with: pip install " + " ".join(missing.keys()))
                 return False
             
-            log_progress("Initializing Qwen3-0.6B...")
+            log_progress("Initializing Qwen2.5-0.5B-Instruct...")
             self._init_qwen()
             
             log_progress("Initializing OCR (PaddleOCR)...")
@@ -115,18 +115,19 @@ class AICoordinator:
             return False
     
     def _init_qwen(self):
-        """Initialize Qwen3 model"""
+        """Initialize the Qwen2.5-0.5B-Instruct model"""
         try:
-            model_path = self.config.get_model_path("qwen3-0.6b")
+            model_path = self.config.get_model_path("qwen2.5-0.5b-instruct")
             if not model_path:
-                logger.warning("Qwen3 model not found. Download via: config.download_model('qwen3-0.6b')")
+                logger.warning("Qwen2.5 model not found. Download via: "
+                               "config.download_model('qwen2.5-0.5b-instruct')")
                 return False
             
             self.qwen = QwenInterface(str(model_path))
-            logger.info("Qwen3 initialized successfully")
+            logger.info("Qwen2.5-0.5B-Instruct initialized successfully")
             return True
         except Exception as e:
-            logger.error(f"Failed to initialize Qwen3: {e}")
+            logger.error(f"Failed to initialize Qwen2.5: {e}")
             return False
     
     def _init_ocr(self):

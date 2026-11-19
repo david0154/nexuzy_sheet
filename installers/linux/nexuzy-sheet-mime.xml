@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) 2026 Nexuzy Lab - Nexuzy Sheet MIME types -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+    <mime-type type="application/x-nexuzy-sheet">
+        <comment>Nexuzy Sheet workbook</comment>
+        <comment xml:lang="hi">Nexuzy Sheet वर्कबुक</comment>
+        <comment xml:lang="bn">Nexuzy Sheet ওয়ার্কবুক</comment>
+        <comment xml:lang="ta">Nexuzy Sheet பணிப்புத்தகம்</comment>
+        <comment xml:lang="es">Libro de trabajo de Nexuzy Sheet</comment>
+        <comment xml:lang="fr">Classeur Nexuzy Sheet</comment>
+        <comment xml:lang="zh">Nexuzy Sheet 工作簿</comment>
+        <comment xml:lang="ru">Книга Nexuzy Sheet</comment>
+        <comment xml:lang="ja">Nexuzy Sheet ブック</comment>
+        <glob pattern="*.nix"/>
+        <magic priority="50">
+            <match type="string" value="BZh" offset="0"/>
+        </magic>
+        <icon name="nexuzy-sheet"/>
+    </mime-type>
+    <mime-type type="application/x-nexuzy-sheet-compressed">
+        <comment>Nexuzy Sheet workbook (compressed)</comment>
+        <glob pattern="*.nxs"/>
+        <magic priority="50">
+            <match type="string" value="BZh" offset="0"/>
+        </magic>
+        <icon name="nexuzy-sheet"/>
+    </mime-type>
+    <mime-type type="application/x-nexuzy-sheet-uncompressed">
+        <comment>Nexuzy Sheet workbook (uncompressed)</comment>
+        <glob pattern="*.nxl"/>
+        <icon name="nexuzy-sheet"/>
+    </mime-type>
+</mime-info>

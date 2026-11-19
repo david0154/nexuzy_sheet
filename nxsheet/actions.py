@@ -5,18 +5,28 @@
 #
 # Developed by Nexuzy Lab
 #
-# Nexuzy Sheet is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Nexuzy Sheet is released under the MIT License.
 #
-# Nexuzy Sheet is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# License: GNU General Public License v3.0
-# https://www.gnu.org/licenses/gpl-3.0.html
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# License: MIT License
+# https://opensource.org/licenses/MIT
 #
 # Project: Nexuzy Sheet
 # Developer: Nexuzy Lab
@@ -75,7 +85,7 @@ class Action(QAction):
                  role: QAction.MenuRole = None):
         """
 
-        :param parent: The parent object, normally :class:`pyspread.MainWindow`
+        :param parent: The parent object, normally the main window
         :param label: The text to appear
         :param callbacks: the callback functions
         :param icon: the :class:`icons.Icon`
@@ -108,7 +118,7 @@ class MainWindowActions(AttrDict):
 
     def __init__(self, parent: QWidget, shortcuts: bool = True):
         """
-        :param parent: The parent object, normally :class:`pyspread.MainWindow`
+        :param parent: The parent object, normally the main window
         :param shortcuts: Enable shortcuts for actions
 
         """
@@ -135,6 +145,13 @@ class MainWindowActions(AttrDict):
                           shortcut='Ctrl+n' if self.shortcuts else "",
                           statustip='Create a new, empty spreadsheet')
 
+        self.new_from_template = Action(
+            self.parent, "New from &template...",
+            self.parent.workflows.file_new_from_template,
+            icon=Icon.new,
+            statustip='Insert a ready-made business template into the '
+                      'current worksheet')
+
         self.open = Action(self.parent, "&Open",
                            self.parent.workflows.file_open,
                            icon=Icon.open,
@@ -152,6 +169,19 @@ class MainWindowActions(AttrDict):
             icon=Icon.save_as,
             shortcut='Shift+Ctrl+s' if self.shortcuts else "",
             statustip='Save spreadsheet to a new file')
+
+        self.autosave_toggle = Action(
+            self.parent, "Auto &save",
+            self.parent.on_toggle_autosave,
+            checkable=True,
+            statustip='Automatically write a recovery copy while the '
+                      'workbook has unsaved changes')
+
+        self.version_history = Action(
+            self.parent, "Version &history...",
+            self.parent.on_version_history,
+            icon=Icon.open,
+            statustip='Restore an auto saved recovery copy or a backup')
 
         self.imprt = Action(self.parent, "&Import",
                             self.parent.workflows.file_import,
@@ -285,6 +315,22 @@ class MainWindowActions(AttrDict):
             icon=Icon.sort_descending,
             statustip='Sort selected cells. The sort order is descending and '
                       'follows the current column.')
+
+        self.fill_down = Action(
+            self.parent, "Fill &down",
+            self.parent.grid.on_fill_down,
+            icon=Icon.shift_down,
+            shortcut='Ctrl+Shift+d' if self.shortcuts else "",
+            statustip='Copy the top cell of each selected column into the '
+                      'cells below it')
+
+        self.fill_right = Action(
+            self.parent, "Fill &right",
+            self.parent.grid.on_fill_right,
+            icon=Icon.shift_right,
+            shortcut='Ctrl+Shift+r' if self.shortcuts else "",
+            statustip='Copy the leftmost cell of each selected row into the '
+                      'cells to its right')
 
         self.toggle_selection_mode = Action(
             self.parent, "Selection mode",
@@ -468,6 +514,27 @@ class MainWindowActions(AttrDict):
 
     def create_format_actions(self):
         """actions for Format menu"""
+
+        self.autofit_columns = Action(
+            self.parent, "AutoFit &columns",
+            self.parent.workflows.autofit_columns,
+            icon=Icon.insert_column,
+            statustip='Adjust the width of the selected columns to their '
+                      'content')
+
+        self.autofit_rows = Action(
+            self.parent, "AutoFit &rows",
+            self.parent.workflows.autofit_rows,
+            icon=Icon.insert_row,
+            statustip='Adjust the height of the selected rows to their '
+                      'content')
+
+        self.autofit_selection = Action(
+            self.parent, "AutoFit &selection",
+            self.parent.workflows.autofit_selection,
+            icon=Icon.merge_cells,
+            statustip='Adjust columns and rows of the selection to their '
+                      'content')
 
         self.copy_format = Action(self.parent, "&Copy format",
                                   self.parent.workflows.format_copy_format,
@@ -858,6 +925,14 @@ class MainWindowActions(AttrDict):
                                            'cell below the bottom right cell '
                                            'of the selection')
 
+        self.insert_function = Action(
+            self.parent, "Insert &function...",
+            self.parent.workflows.macro_insert_function,
+            icon=Icon.insert_sum,
+            shortcut='Shift+F3' if self.shortcuts else "",
+            statustip='Insert an Excel compatible function such as SUM, '
+                      'AVERAGE or VLOOKUP into the current cell')
+
     def create_help_actions(self):
         """actions for Help menu"""
 
@@ -877,9 +952,15 @@ class MainWindowActions(AttrDict):
                                    icon=Icon.dependencies,
                                    statustip='List and install dependencies')
 
+        self.ai_model = Action(self.parent, "Offline AI model...",
+                               self.parent.on_ai_model_info,
+                               icon=Icon.help,
+                               statustip='Show the source and status of the '
+                                         'offline AI model')
+
         self.about = Action(self.parent, "About Nexuzy Sheet...",
                             self.parent.on_about,
-                            icon=Icon.pyspread,
+                            icon=Icon.app,
                             statustip='About Nexuzy Sheet',
                             role=QAction.MenuRole.AboutRole)
 
@@ -1091,7 +1172,7 @@ class SpellTextEditActions(AttrDict):
 
     def __init__(self, parent: QWidget):
         """
-        :param parent: The parent object, normally :class:`pyspread.MainWindow`
+        :param parent: The parent object, normally the main window
 
         """
 
